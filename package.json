@@ -1,0 +1,42 @@
+{
+  "name": "mcp-linear-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run lint && tsc --skipLibCheck",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch & node --watch dist/index.js",
+    "clean": "rimraf dist",
+    "lint": "eslint src",
+    "prepare": "npm run build"
+  },
+  "bin": {
+    "mcp-linear-app": "./dist/index.js"
+  },
+  "dependencies": {
+    "@linear/sdk": "^38.0.0",
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/node": "^20",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.1",
+    "globals": "^16.0.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5",
+    "typescript-eslint": "^8.26.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
