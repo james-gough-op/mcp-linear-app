@@ -83,6 +83,42 @@ const mockProject = {
   }
 };
 
+// Mock data for issue with project
+const mockIssueWithProject = {
+  id: MOCK_ISSUE_ID,
+  identifier: "TEST-123",
+  title: "Test Issue",
+  project: {
+    id: MOCK_PROJECT_ID,
+    name: "Test Project"
+  },
+  labels: {
+    nodes: [
+      { id: EXISTING_LABEL_ID, name: 'Existing Label', color: '#CCCCCC' }
+    ]
+  }
+};
+
+// Mock issue creation response with project
+const mockNewIssueWithProject = {
+  id: MOCK_ISSUE_ID,
+  identifier: "TEST-123",
+  title: "Test Issue",
+  description: "Test issue description",
+  priority: 3, // Medium
+  state: {
+    id: "state-123",
+    name: "In Progress"
+  },
+  project: {
+    id: MOCK_PROJECT_ID,
+    name: "Test Project"
+  },
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  url: "https://linear.app/test/issue/TEST-123"
+};
+
 // Handle all GraphQL requests to Linear API
 export const handlers = [
   http.post('https://api.linear.app/graphql', async ({ request }) => {
@@ -158,14 +194,55 @@ export const handlers = [
       });
     }
     
-    // Handle updateIssue mutation
-    if (body.query && body.query.includes('updateIssue')) {
+    // Handle issueUpdate mutation for project assignment
+    if (body.query && body.query.includes('issueUpdate') && body.variables?.projectId) {
+      console.log('Handling issueUpdate for project assignment');
+      return HttpResponse.json<GraphQLResponse>({
+        data: {
+          issueUpdate: {
+            success: true,
+            issue: mockIssueWithProject
+          }
+        }
+      });
+    }
+    
+    // Handle general updateIssue mutation
+    if (body.query && body.query.includes('updateIssue') || (body.query && body.query.includes('issueUpdate') && !body.variables?.projectId)) {
       console.log('Returning mock updated issue');
       return HttpResponse.json<GraphQLResponse>({
         data: {
           issueUpdate: {
             success: true,
             issue: mockUpdatedIssue
+          }
+        }
+      });
+    }
+    
+    // Handle issueCreate mutation with project
+    if (body.query && body.query.includes('issueCreate') && body.variables?.projectId) {
+      console.log('Handling issueCreate with project assignment');
+      return HttpResponse.json<GraphQLResponse>({
+        data: {
+          issueCreate: {
+            success: true,
+            issue: mockNewIssueWithProject
+          }
+        }
+      });
+    }
+    
+    // Handle regular issueCreate mutation
+    if (body.query && body.query.includes('issueCreate')) {
+      console.log('Handling issueCreate mutation');
+      const newIssue = { ...mockIssue };
+      newIssue.title = body.variables?.title || "New Issue";
+      return HttpResponse.json<GraphQLResponse>({
+        data: {
+          issueCreate: {
+            success: true,
+            issue: newIssue
           }
         }
       });
@@ -195,7 +272,9 @@ export const mockIds = {
 export const mockData = {
   mockLabel,
   mockDocLabel,
-  mockProject
+  mockProject,
+  mockIssueWithProject,
+  mockNewIssueWithProject
 };
 
 // Setup MSW server

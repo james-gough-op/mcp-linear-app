@@ -1,41 +1,47 @@
 import { z } from "zod";
 import {
-    Issue,
+  Issue,
 } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
+import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
 
 /**
- * Enum for Linear issue states/statuses
+ * Linear issue state constants
  */
-export enum LinearIssueState {
-  Triage = "triage",
-  Backlog = "backlog",
-  Todo = "todo",
-  InProgress = "in_progress", 
-  Done = "done",
-  Canceled = "canceled"
-}
+export const LINEAR_ISSUE_STATES = {
+  TRIAGE: "triage",
+  BACKLOG: "backlog",
+  TODO: "todo",
+  IN_PROGRESS: "in_progress",
+  DONE: "done",
+  CANCELED: "canceled"
+} as const;
+
+export type LinearIssueStateType = typeof LINEAR_ISSUE_STATES[keyof typeof LINEAR_ISSUE_STATES];
 
 /**
- * Enum for Linear issue priorities
+ * Linear issue priority constants
+ * 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low
  */
-export enum LinearIssuePriority {
-  NoPriority = 0,
-  Urgent = 1,
-  High = 2, 
-  Medium = 3,
-  Low = 4
-}
+export const LINEAR_ISSUE_PRIORITIES = {
+  NO_PRIORITY: 0,
+  URGENT: 1,
+  HIGH: 2,
+  MEDIUM: 3,
+  LOW: 4
+} as const;
+
+export type LinearIssuePriorityType = typeof LINEAR_ISSUE_PRIORITIES[keyof typeof LINEAR_ISSUE_PRIORITIES];
 
 // Define string mappings for the priorities
 export const PriorityStringToNumber: Record<string, number> = {
-  'no_priority': 0,
-  'urgent': 1,
-  'high': 2,
-  'medium': 3,
-  'low': 4
+  'no_priority': LINEAR_ISSUE_PRIORITIES.NO_PRIORITY,
+  'urgent': LINEAR_ISSUE_PRIORITIES.URGENT,
+  'high': LINEAR_ISSUE_PRIORITIES.HIGH,
+  'medium': LINEAR_ISSUE_PRIORITIES.MEDIUM,
+  'low': LINEAR_ISSUE_PRIORITIES.LOW
 };
 
 // State string mappings have been replaced with a dynamic function 
@@ -88,6 +94,16 @@ function formatIssueToHumanReadable(issue: Issue): string {
     result += `\n`;
   }
   
+  // Project information if exists
+  if (issue.project) {
+    result += `--- PROJECT INFO ---\n`;
+    result += `PROJECT ID: ${issue.project.id}\n`;
+    if (issue.project.name) {
+      result += `PROJECT NAME: ${safeText(issue.project.name)}\n`;
+    }
+    result += `\n`;
+  }
+  
   // Team information
   result += `--- TEAM INFO ---\n`;
   if (issue.team && issue.team.name) {
@@ -122,12 +138,18 @@ const createIssueSchema = z.object({
   description: z.string().describe("The description of the issue"),
   dueDate: z.string().describe("The due date of the issue").optional(),
   status: z.enum([
-    "triage", "backlog", "todo", "in_progress", "done", "canceled"
-  ]).default("backlog").describe("The status of the issue"),
+    LINEAR_ISSUE_STATES.TRIAGE, 
+    LINEAR_ISSUE_STATES.BACKLOG, 
+    LINEAR_ISSUE_STATES.TODO, 
+    LINEAR_ISSUE_STATES.IN_PROGRESS, 
+    LINEAR_ISSUE_STATES.DONE, 
+    LINEAR_ISSUE_STATES.CANCELED
+  ]).default(LINEAR_ISSUE_STATES.BACKLOG).describe("The status of the issue"),
   priority: z.enum([
     "no_priority", "urgent", "high", "medium", "low"
   ]).default("no_priority").describe("The priority of the issue"),
   parentId: z.string().describe("The ID of the parent issue, used to create a sub-issue").optional(),
+  projectId: LinearIdSchema.optional().describe("The ID of the project to assign the issue to")
 });
 
 /**
@@ -157,6 +179,20 @@ export const LinearCreateIssueTool = createSafeTool({
             text: "Error: Issue title cannot be empty",
           }],
         };
+      }
+      
+      // Validate projectId if provided
+      if (args.projectId) {
+        try {
+          LinearIdSchema.parse(args.projectId);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: Invalid project ID format. ${error instanceof Error ? error.message : 'Project ID must be a valid Linear ID'}`,
+            }],
+          };
+        }
       }
       
       // Convert priority from string to number if provided
@@ -200,6 +236,7 @@ export const LinearCreateIssueTool = createSafeTool({
         priority: priorityValue,
         teamId: args.teamId,
         parentId: args.parentId,
+        projectId: args.projectId,
       });
       
       if (!createIssueResponse) {
@@ -217,10 +254,16 @@ export const LinearCreateIssueTool = createSafeTool({
         // Access issue and get ID with correct data type
         const issue = await createIssueResponse.issue;
         if (issue && issue.id) {
+          // Include project info in success message if available
+          let projectInfo = "";
+          if (args.projectId) {
+            projectInfo = `\nAssigned to Project ID: ${args.projectId}`;
+          }
+          
           return {
             content: [{
               type: "text",
-              text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issue.id}`,
+              text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issue.id}${projectInfo}`,
             }],
           };
         }
@@ -247,10 +290,16 @@ export const LinearCreateIssueTool = createSafeTool({
       // Directly check the parsed response result
       const issueId = issueData?.id || (createIssueResponse as unknown as { id?: string })?.id;
       if (issueId) {
+        // Include project info in success message if available
+        let projectInfo = "";
+        if (args.projectId) {
+          projectInfo = `\nAssigned to Project ID: ${args.projectId}`;
+        }
+        
         return {
           content: [{
             type: "text",
-            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueId}`,
+            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueId}${projectInfo}`,
           }],
         };
       }
@@ -278,10 +327,16 @@ export const LinearCreateIssueTool = createSafeTool({
       // Success case with ID available
       if (issueData.title === undefined && issueData.description === undefined) {
         // Only ID is available, without complete data
+        // Include project info in success message if available
+        let projectInfo = "";
+        if (args.projectId) {
+          projectInfo = `\nAssigned to Project ID: ${args.projectId}`;
+        }
+        
         return {
           content: [{
             type: "text",
-            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueData.id}`,
+            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueData.id}${projectInfo}`,
           }],
         };
       }
