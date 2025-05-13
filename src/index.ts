@@ -1,16 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerTool, enhanceMcpServer } from "./libs/tool-utils.js";
-import { 
-  LinearCreateIssueTool, 
-  LinearSearchIssuesTool, 
-  LinearGetProfileTool, 
-  LinearCreateCommentTool,
-  LinearUpdateCommentTool,
-  LinearGetIssueTool,
-  LinearGetTeamIdTool,
-  LinearUpdateIssueTool,
-  LinearGetCommentTool
+import { enhanceMcpServer, registerTool } from "./libs/tool-utils.js";
+import {
+    LinearCreateCommentTool,
+    LinearCreateIssueTool,
+    LinearCreateProjectTool,
+    LinearGetCommentTool,
+    LinearGetIssueTool,
+    LinearGetProfileTool,
+    LinearGetTeamIdTool,
+    LinearSearchIssuesTool,
+    LinearUpdateCommentTool,
+    LinearUpdateIssueTool
 } from "./tools/linear/tools.js";
 
 /**
@@ -38,6 +39,7 @@ async function main() {
       LinearGetTeamIdTool,
       LinearUpdateIssueTool,
       LinearGetCommentTool,
+      LinearCreateProjectTool,
     ]);
 
     // Connect to stdio transport
