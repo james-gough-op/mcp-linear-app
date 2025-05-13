@@ -1,23 +1,8 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import { Comment } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
-
-/**
- * Interface defining the structure of an issue comment
- * Used for type safety when processing comments
- */
-interface IssueComment {
-  id: string;
-  body: string;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-}
 
 /**
  * Schema definition for the get comment tool
@@ -33,7 +18,7 @@ const getCommentSchema = z.object({
  * @param comments Array of comment objects
  * @returns Formatted text representation of comments
  */
-function formatCommentsToHumanReadable(comments: IssueComment[]): string {
+function formatCommentsToHumanReadable(comments: Comment[]): string {
   if (!comments || comments.length === 0) {
     return "No comments found for this issue.";
   }
@@ -119,7 +104,7 @@ export const LinearGetCommentTool = createSafeTool({
           createdAt: comment.createdAt,
           updatedAt: comment.updatedAt,
           user: userData
-        };
+        } as Comment;
       }));
       
       // Format the response

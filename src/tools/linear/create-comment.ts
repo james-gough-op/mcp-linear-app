@@ -1,28 +1,19 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import {
+  Comment
+} from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-
-/**
- * Interface for comment response data
- */
-interface CommentResponseData {
-  id?: string;
-  body?: string;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  issueId?: string;
-  url?: string;
-  success?: boolean;
-  [key: string]: unknown;
-}
+import { createSafeTool } from "../../libs/tool-utils.js";
 
 /**
  * Interface for Linear API comment response
  */
-interface LinearCommentResponse {
+interface CommentCreateResponse {
   success?: boolean;
-  comment?: CommentResponseData;
-  [key: string]: unknown;
+  commentCreate?: {
+    comment: Comment;
+    success: boolean;
+  };
 }
 
 /**
@@ -77,10 +68,9 @@ export const LinearCreateCommentTool = createSafeTool({
         };
       }
       
-      // Mendapatkan ID komentar dari respons
-      // Linear SDK mengembalikan hasil dalam pola success dan entity
+      // Linear SDK returns results in success and entity pattern
       if (createCommentResponse.success) {
-        // Mengakses komentar dan mendapatkan ID dengan tipe data yang benar
+        // Access comment and get ID with the correct data type
         const comment = await createCommentResponse.comment;
         if (comment && comment.id) {
           return {
@@ -93,7 +83,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       // Extract data from response to check for success
-      const commentResponse = createCommentResponse as unknown as LinearCommentResponse;
+      const commentResponse = createCommentResponse as unknown as CommentCreateResponse;
       
       // If the response indicates failure, return an error
       if (commentResponse.success === false) {
@@ -106,9 +96,11 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       // Extract comment data from the correct property
-      const commentData: CommentResponseData = commentResponse.comment || createCommentResponse as unknown as CommentResponseData;
+      const commentData: Comment = 
+        (commentResponse.commentCreate && commentResponse.commentCreate.comment) || 
+        (createCommentResponse as unknown as Comment);
       
-      // Langsung cek hasil respons yang telah diparsing
+      // Check the parsed response result directly
       const commentId = commentData?.id || (createCommentResponse as unknown as { id?: string })?.id;
       if (commentId) {
         return {
@@ -120,7 +112,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       if (!commentData) {
-        // Tampilkan pesan sukses meski data tidak lengkap
+        // Show success message even if data is incomplete
         return {
           content: [{
             type: "text",
@@ -130,7 +122,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       if (!commentData.id) {
-        // Data komentar ada tapi tidak ada ID
+        // Comment data exists but no ID
         return {
           content: [{
             type: "text",
@@ -139,7 +131,7 @@ export const LinearCreateCommentTool = createSafeTool({
         };
       }
       
-      // Kasus sukses dengan ID tersedia
+      // Success case with ID available
       return {
         content: [{
           type: "text",

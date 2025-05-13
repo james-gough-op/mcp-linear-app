@@ -1,35 +1,15 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import { User } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
-
-/**
- * Interface for user profile data
- */
-interface UserProfile {
-  id: string;
-  name: string;
-  displayName?: string;
-  email?: string;
-  active?: boolean;
-  admin?: boolean;
-  guest?: boolean;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  lastSeen?: string | Date;
-  timezone?: string;
-  createdIssueCount?: number;
-  avatarBackgroundColor?: string;
-  url?: string;
-  isMe?: boolean;
-}
 
 /**
  * Format user profile data into human-readable text with simplified format
  * @param profile User profile data
  * @returns Formatted text for human readability
  */
-function formatProfileToHumanReadable(profile: UserProfile): string {
+function formatProfileToHumanReadable(profile: User): string {
   if (!profile || !profile.id) {
     return "Invalid or incomplete profile data";
   }
@@ -94,24 +74,8 @@ export const LinearGetProfileTool = createSafeTool({
         };
       }
       
-      // Convert to UserProfile format for safe processing
-      const userProfile: UserProfile = {
-        id: profile.id || "unknown-id",
-        name: profile.name || "No Name",
-        displayName: profile.displayName,
-        email: profile.email,
-        active: profile.active,
-        admin: profile.admin,
-        guest: profile.guest,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt,
-        lastSeen: profile.lastSeen,
-        timezone: profile.timezone,
-        createdIssueCount: profile.createdIssueCount,
-        avatarBackgroundColor: profile.avatarBackgroundColor,
-        url: profile.url,
-        isMe: profile.isMe
-      };
+      // Use the profile directly as User type
+      const userProfile = profile as unknown as User;
       
       // Format profile to human-readable text
       const formattedText = formatProfileToHumanReadable(userProfile);

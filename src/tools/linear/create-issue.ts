@@ -1,7 +1,10 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import {
+    Issue,
+} from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-import { getPriorityLabel, formatDate, safeText, getStateId, normalizeStateName } from '../../libs/utils.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
+import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
 
 /**
  * Enum for Linear issue states/statuses
@@ -39,40 +42,14 @@ export const PriorityStringToNumber: Record<string, number> = {
 // that calls the Linear API to get valid state IDs
 
 /**
- * Interface for issue response data
+ * Interface for the create issue response
  */
-interface IssueResponseData {
-  id?: string;
-  title?: string;
-  description?: string;
-  priority?: number;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  dueDate?: string | Date;
-  url?: string;
-  parent?: {
-    id?: string;
-    title?: string;
-  };
-  state?: {
-    id?: string;
-    name?: string;
-    color?: string;
-  };
-  team?: {
-    id?: string;
-    name?: string;
-  };
-  [key: string]: unknown;
-}
-
-/**
- * Interface for Linear API create response
- */
-interface LinearCreateResponse {
+interface IssueCreateResponse {
   success?: boolean;
-  issue?: IssueResponseData;
-  [key: string]: unknown;
+  issueCreate?: {
+    issue: Issue;
+    success: boolean;
+  };
 }
 
 /**
@@ -80,7 +57,7 @@ interface LinearCreateResponse {
  * @param issue Issue data to format
  * @returns Formatted text for human readability
  */
-function formatIssueToHumanReadable(issue: IssueResponseData): string {
+function formatIssueToHumanReadable(issue: Issue): string {
   if (!issue || !issue.id) {
     return "Invalid or incomplete issue data";
   }
@@ -214,7 +191,7 @@ export const LinearCreateIssueTool = createSafeTool({
         }
       }
 
-      // Create the issue
+      // Create the issue with SDK's own input type
       const createIssueResponse = await linearClient.createIssue({
         title: args.title,
         description: args.description,
@@ -250,10 +227,10 @@ export const LinearCreateIssueTool = createSafeTool({
       }
       
       // Extract data from response - fix to handle proper response structure
-      const createResponse = createIssueResponse as unknown as LinearCreateResponse;
+      const issueResponse = createIssueResponse as unknown as IssueCreateResponse;
       
       // Check if the response follows the expected structure with success flag
-      if (createResponse.success === false) {
+      if (issueResponse.success === false) {
         return {
           content: [{
             type: "text",
@@ -263,7 +240,9 @@ export const LinearCreateIssueTool = createSafeTool({
       }
       
       // Extract issue data from the correct property
-      const issueData: IssueResponseData = createResponse.issue || createIssueResponse as unknown as IssueResponseData;
+      const issueData: Issue = 
+        (issueResponse.issueCreate && issueResponse.issueCreate.issue) || 
+        (createIssueResponse as unknown as Issue);
       
       // Directly check the parsed response result
       const issueId = issueData?.id || (createIssueResponse as unknown as { id?: string })?.id;

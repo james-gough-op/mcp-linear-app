@@ -1,7 +1,8 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import { Issue, WorkflowState } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-import { getPriorityLabel, formatDate, safeText } from '../../libs/utils.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
+import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
 /**
  * Enum for Linear issue priorities as strings for schema
@@ -18,30 +19,12 @@ export const PriorityStringToNumber: Record<string, number> = {
 };
 
 /**
- * Interface for issue data structure
- */
-interface IssueData {
-  id: string;
-  title: string;
-  description?: string | null;
-  state?: { name: string } | null;
-  priority: number;
-  assignee?: unknown;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-  url: string;
-  labels?: unknown;
-  dueDate?: string | Date | null;
-  commentsCount?: number;
-}
-
-/**
  * Format a single issue to human readable text
  * 
  * @param issue The issue data
  * @returns Formatted human readable text
  */
-function formatIssueToHumanReadable(issue: IssueData): string {
+function formatIssueToHumanReadable(issue: Issue): string {
   if (!issue || !issue.id) {
     return "Invalid or incomplete issue data";
   }
@@ -68,9 +51,13 @@ function formatIssueToHumanReadable(issue: IssueData): string {
   // Priority
   result += `Priority: ${getPriorityLabel(issue.priority)}\n`;
   
-  // Comments count if available
-  if (typeof issue.commentsCount === 'number') {
-    result += `Comments: ${issue.commentsCount}\n`;
+  // Comments count if available - use a more flexible property access
+  // since it might be named differently in different API versions
+  const commentsCount = (issue as Issue & { commentCount?: number; commentsCount?: number }).commentCount || 
+                      (issue as Issue & { commentCount?: number; commentsCount?: number }).commentsCount || 
+                      0;
+  if (typeof commentsCount === 'number') {
+    result += `Comments: ${commentsCount}\n`;
   }
   
   // Due date if present
@@ -145,8 +132,11 @@ export const LinearSearchIssuesTool = createSafeTool({
         };
       }
 
+      // Use nodes as Issue type
+      const allIssues = getAllIssues.nodes as unknown as Issue[];
+      
       // Filter issues by status if provided
-      let filteredNodes = getAllIssues.nodes;
+      let filteredNodes = allIssues;
       
       if (args.status) {
         filteredNodes = filteredNodes.filter(issue => {
@@ -155,7 +145,7 @@ export const LinearSearchIssuesTool = createSafeTool({
           
           // Normalize the state name for comparison
           const stateName = typeof issue.state === 'object' 
-            ? (issue.state as { name?: string })?.name?.toLowerCase?.()?.replace?.(/\s+/g, '_') || ''
+            ? (issue.state as WorkflowState)?.name?.toLowerCase?.()?.replace?.(/\s+/g, '_') || ''
             : '';
           
           const targetState = args.status?.toLowerCase().replace(/\s+/g, '_') || '';
@@ -243,41 +233,7 @@ export const LinearSearchIssuesTool = createSafeTool({
       
       // Add each formatted issue
       for (const issue of paginatedNodes) {
-        // Cast to any first to handle unknown structure of Linear API response
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const linearIssue = issue as any;
-        
-        // Improved state extraction
-        let state = null;
-        if (linearIssue.state) {
-          if (typeof linearIssue.state === 'object') {
-            // Normal case: state is an object
-            state = { 
-              name: linearIssue.state.name || "No status yet" 
-            };
-          } else {
-            // Handle case where state is just an ID reference
-            state = { name: "Status set" };
-          }
-        }
-        
-        // Create issue data object with required fields
-        const issueData: IssueData = {
-          id: linearIssue.id,
-          title: linearIssue.title,
-          description: linearIssue.description,
-          state: state,
-          priority: linearIssue.priority,
-          assignee: linearIssue.assignee,
-          createdAt: linearIssue.createdAt,
-          updatedAt: linearIssue.updatedAt,
-          url: linearIssue.url,
-          labels: linearIssue.labels,
-          dueDate: linearIssue.dueDate,
-          commentsCount: linearIssue.commentCount || 0  // Use commentCount property directly
-        };
-        
-        issuesText += formatIssueToHumanReadable(issueData);
+        issuesText += formatIssueToHumanReadable(issue);
       }
       
       // Add pagination information

@@ -1,7 +1,10 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import {
+    Issue
+} from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-import { getPriorityLabel, formatDate, safeText, getStateId, normalizeStateName } from '../../libs/utils.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
+import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
 
 /**
  * Enum for Linear issue priorities as strings for schema
@@ -18,45 +21,14 @@ export const PriorityStringToNumber: Record<string, number> = {
 };
 
 /**
- * Interface for issue response data
- */
-interface IssueResponseData {
-  id?: string;
-  title?: string;
-  description?: string;
-  priority?: number;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  dueDate?: string | Date;
-  url?: string;
-  parent?: {
-    id?: string;
-    title?: string;
-  };
-  state?: {
-    id?: string;
-    name?: string;
-    color?: string;
-  };
-  team?: {
-    id?: string;
-    name?: string;
-  };
-  assignee?: {
-    id?: string;
-    name?: string;
-    email?: string;
-  };
-  [key: string]: unknown;
-}
-
-/**
  * Interface for Linear API update response
  */
-interface LinearUpdateResponse {
+interface IssueUpdateResponse {
   success?: boolean;
-  issue?: IssueResponseData;
-  [key: string]: unknown;
+  issueUpdate?: {
+    issue: Issue;
+    success: boolean;
+  };
 }
 
 /**
@@ -64,7 +36,7 @@ interface LinearUpdateResponse {
  * @param issue Issue data to format
  * @returns Formatted text for human readability
  */
-function formatIssueToHumanReadable(issue: IssueResponseData): string {
+function formatIssueToHumanReadable(issue: Issue): string {
   if (!issue || !issue.id) {
     return "Invalid or incomplete issue data";
   }
@@ -246,7 +218,7 @@ export const LinearUpdateIssueTool = createSafeTool({
       }
       
       // Extract data from response - fix to handle proper response structure
-      const updateResponse = updateIssueResponse as unknown as LinearUpdateResponse;
+      const updateResponse = updateIssueResponse as unknown as IssueUpdateResponse;
       
       // Check if the response follows the expected structure with success flag
       if (updateResponse.success === false) {
@@ -259,7 +231,9 @@ export const LinearUpdateIssueTool = createSafeTool({
       }
       
       // Extract issue data from the correct property
-      const issueData: IssueResponseData = updateResponse.issue || updateIssueResponse as unknown as IssueResponseData;
+      const issueData: Issue = 
+        (updateResponse.issueUpdate && updateResponse.issueUpdate.issue) || 
+        (updateIssueResponse as unknown as Issue);
       
       // Directly check the parsed response result
       const issueId = issueData?.id || (updateIssueResponse as unknown as { id?: string })?.id;

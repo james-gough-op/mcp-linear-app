@@ -9,7 +9,12 @@
     "dev": "tsc --watch & node --watch dist/index.js",
     "clean": "rimraf dist",
     "lint": "eslint src",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "tsc --skipLibCheck && node dist/tests/client.test.js",
+    "test:auth": "tsc --skipLibCheck && node dist/tests/auth.test.js",
+    "test:errors": "tsc --skipLibCheck && node dist/tests/errors.test.js",
+    "test:ids": "tsc --skipLibCheck && node dist/tests/id-management.test.js",
+    "generate-types": "graphql-codegen --config codegen.yml"
   },
   "bin": {
     "mcp-linear-app": "./dist/index.js"
@@ -22,6 +27,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@graphql-codegen/cli": "^5.0.6",
+    "@graphql-codegen/typescript": "^4.1.6",
+    "@graphql-codegen/typescript-operations": "^4.6.1",
     "@types/node": "^20",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",

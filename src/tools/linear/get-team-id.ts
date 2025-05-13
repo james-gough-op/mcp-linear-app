@@ -1,29 +1,14 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import { Team } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-
-/**
- * Interface for team data
- */
-interface TeamData {
-  id: string;
-  name: string;
-  key: string;
-  description?: string;
-  color?: string;
-  createdAt?: string | Date;
-  updatedAt?: string | Date;
-  issueCount?: number;
-  private?: boolean;
-  url?: string;
-}
+import { createSafeTool } from "../../libs/tool-utils.js";
 
 /**
  * Format team data into human-readable text
  * @param teams Array of team data objects
  * @returns Formatted text for human readability
  */
-function formatTeamsToHumanReadable(teams: TeamData[]): string {
+function formatTeamsToHumanReadable(teams: Team[]): string {
   if (!teams || teams.length === 0) {
     return "No teams found in your Linear workspace.";
   }
@@ -61,20 +46,8 @@ export const LinearGetTeamIdTool = createSafeTool({
         };
       }
       
-      // Convert to TeamData format for safe processing
-      const teams: TeamData[] = teamsResponse.nodes.map(team => ({
-        id: team.id || "unknown-id",
-        name: team.name || "Unnamed Team",
-        key: team.key || "unknown-key",
-        description: team.description,
-        color: team.color,
-        createdAt: team.createdAt,
-        updatedAt: team.updatedAt,
-        issueCount: team.issueCount,
-        private: team.private,
-        // Generate a URL if not available directly from the API
-        url: `https://linear.app/team/${team.key}`
-      }));
+      // Use the team nodes directly as Team type
+      const teams = teamsResponse.nodes as unknown as Team[];
       
       // Format teams to human-readable text
       const formattedText = formatTeamsToHumanReadable(teams);

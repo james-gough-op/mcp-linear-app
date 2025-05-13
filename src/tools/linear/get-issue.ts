@@ -1,7 +1,8 @@
-import { createSafeTool } from "../../libs/tool-utils.js";
 import { z } from "zod";
+import { Comment, Issue, WorkflowState } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
-import { getPriorityLabel, formatDate, safeText } from '../../libs/utils.js';
+import { createSafeTool } from "../../libs/tool-utils.js";
+import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
 /**
  * Schema definition for the get issue tool
@@ -12,56 +13,13 @@ const getIssueSchema = z.object({
 });
 
 /**
- * Interface defining the structure of an issue comment
- * Used for type safety when processing comments
- */
-interface IssueComment {
-  id: string;
-  body: string;
-  createdAt: string;
-  updatedAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-}
-
-/**
- * Interface for issue data object
- */
-interface IssueData {
-  id: string;
-  title: string;
-  description?: string;
-  priority: number;
-  createdAt: string | Date;
-  updatedAt: string | Date;
-  dueDate?: string | Date;
-  url: string;
-  state?: unknown;
-  assignee?: unknown;
-  labels?: unknown;
-}
-
-/**
- * Interface for status object
- */
-interface StatusData {
-  id: string;
-  name: string;
-  color: string;
-  type: string;
-}
-
-/**
  * Interface for sub-issue object
  */
 interface SubIssueData {
   id: string;
   title: string;
   priority: number;
-  status: StatusData | null;
+  status: WorkflowState | null;
 }
 
 /**
@@ -75,9 +33,9 @@ interface SubIssueData {
  * @returns Formatted human readable text
  */
 function formatIssueToHumanReadable(
-  issue: IssueData, 
-  comments: IssueComment[], 
-  status: StatusData | null,
+  issue: Issue, 
+  comments: Comment[], 
+  status: WorkflowState | null,
   subIssues: SubIssueData[]
 ): string {
   if (!issue || !issue.id) {
@@ -175,34 +133,31 @@ export const LinearGetIssueTool = createSafeTool({
       }
       
       // Safely fetch comments with error handling
-      let comments: IssueComment[] = [];
+      let comments: Comment[] = [];
       try {
         const commentsQuery = await issue.comments();
         
         // Process and transform comments to a consistent format
-        comments = commentsQuery.nodes.map((comment: unknown): IssueComment => {
+        comments = await Promise.all(commentsQuery.nodes.map(async (comment) => {
           try {
-            // Apply explicit type checking to ensure proper comment structure
-            const typedComment = comment as {
-              id: string;
-              body: string;
-              createdAt: string;
-              updatedAt: string;
-              user: { id: string; name: string; email: string } | null;
-            };
+            // Process user data if available
+            let userData = null;
+            if (comment.user) {
+              const user = await comment.user;
+              userData = {
+                id: user.id,
+                name: user.name,
+                email: user.email
+              };
+            }
             
-            // Extract and format relevant comment data
             return {
-              id: typedComment.id || "unknown-id",
-              body: typedComment.body || "",
-              createdAt: typedComment.createdAt || new Date().toISOString(),
-              updatedAt: typedComment.updatedAt || new Date().toISOString(),
-              user: typedComment.user ? {
-                id: typedComment.user.id || "unknown-user-id",
-                name: typedComment.user.name || "Unknown User",
-                email: typedComment.user.email || ""
-              } : null
-            };
+              id: comment.id || "unknown-id",
+              body: comment.body || "",
+              createdAt: comment.createdAt || new Date().toISOString(),
+              updatedAt: comment.updatedAt || new Date().toISOString(),
+              user: userData
+            } as Comment;
           } catch {
             // Return fallback comment on parsing error
             return {
@@ -211,9 +166,9 @@ export const LinearGetIssueTool = createSafeTool({
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               user: null
-            };
+            } as Comment;
           }
-        });
+        }));
       } catch {
         // Fail gracefully if comments can't be loaded
         comments = [{
@@ -222,11 +177,11 @@ export const LinearGetIssueTool = createSafeTool({
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           user: null
-        }];
+        } as Comment];
       }
 
       // Safely fetch issue state/status with error handling
-      let status: StatusData | null = null;
+      let status: WorkflowState | null = null;
       try {
         const stateData = await issue.state;
         if (stateData) {
@@ -235,7 +190,7 @@ export const LinearGetIssueTool = createSafeTool({
             name: stateData.name || "Unknown status",
             color: stateData.color || "#cccccc",
             type: stateData.type || "unknown",
-          };
+          } as WorkflowState;
         }
       } catch {
         // Fail gracefully if status can't be loaded
@@ -244,7 +199,7 @@ export const LinearGetIssueTool = createSafeTool({
           name: "Error loading status",
           color: "#cccccc",
           type: "error",
-        };
+        } as WorkflowState;
       }
       
       // Fetch sub-issues with error handling
@@ -258,7 +213,7 @@ export const LinearGetIssueTool = createSafeTool({
           for (const childIssue of childIssuesQuery.nodes) {
             try {
               // Get status for each sub-issue
-              let subIssueStatus: StatusData | null = null;
+              let subIssueStatus: WorkflowState | null = null;
               try {
                 const childStateData = await childIssue.state;
                 if (childStateData) {
@@ -267,7 +222,7 @@ export const LinearGetIssueTool = createSafeTool({
                     name: childStateData.name || "Unknown status",
                     color: childStateData.color || "#cccccc",
                     type: childStateData.type || "unknown",
-                  };
+                  } as WorkflowState;
                 }
               } catch {
                 subIssueStatus = null;
@@ -291,19 +246,8 @@ export const LinearGetIssueTool = createSafeTool({
         subIssues = [];
       }
       
-      // Create normalized issue data object with safe defaults
-      const issueData: IssueData = {
-        id: issue.id || "unknown-id",
-        title: issue.title || "No title",
-        description: issue.description || undefined,
-        priority: typeof issue.priority === 'number' ? issue.priority : 0,
-        createdAt: issue.createdAt || new Date(),
-        updatedAt: issue.updatedAt || new Date(),
-        dueDate: issue.dueDate || undefined,
-        url: issue.url || `https://linear.app/issue/${args.issueId}`,
-        assignee: issue.assignee || undefined,
-        labels: issue.labels || undefined
-      };
+      // Use the issue directly as an Issue type
+      const issueData = issue as unknown as Issue;
       
       // Format issue data to human readable text
       const formattedText = formatIssueToHumanReadable(issueData, comments, status, subIssues);

@@ -1,0 +1,8 @@
+schema:
+  - https://api.linear.app/graphql:
+      headers:
+        Authorization: Bearer ${LINEAR_API_KEY}
+generates:
+  ./src/generated/linear-types.ts:
+    plugins:
+      - typescript
