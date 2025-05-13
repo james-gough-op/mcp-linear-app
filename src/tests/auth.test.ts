@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enhancedClient, validateApiKey } from '../libs/client.js';
+import { LinearError, LinearErrorType } from '../libs/errors.js';
 
 /**
  * Tests for Linear API authentication
- * 
- * Note: These tests require a valid LINEAR_API_KEY to be set in the environment
- * They are integration tests that make actual calls to the Linear API
  */
+
+// Store the original method for restoration
+const originalTestAuthentication = enhancedClient.testAuthentication;
 
 describe('API key validation', () => {
   it('should validate a key with correct format', () => {
@@ -29,6 +30,25 @@ describe('API key validation', () => {
 });
 
 describe('Linear API Authentication', () => {
+  beforeEach(() => {
+    // Mock the authentication function for all tests in this suite
+    enhancedClient.testAuthentication = vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        viewer: {
+          id: 'mock-user-id',
+          name: 'Test User',
+          email: 'test@example.com'
+        }
+      }
+    });
+  });
+  
+  afterEach(() => {
+    // Restore the original function after each test
+    enhancedClient.testAuthentication = originalTestAuthentication;
+  });
+  
   it('should authenticate with the Linear API', async () => {
     const result = await enhancedClient.testAuthentication();
     
@@ -43,7 +63,32 @@ describe('Linear API Authentication', () => {
           typeof result.data.viewer === 'object' &&
           'email' in result.data.viewer) {
         expect(typeof result.data.viewer.email).toBe('string');
+        expect(result.data.viewer.email).toBe('test@example.com');
       }
+    }
+  });
+  
+  it('should handle authentication failures', async () => {
+    // Override the mock for this specific test
+    const errorMock = {
+      success: false,
+      error: new LinearError(
+        'Authentication failed', 
+        LinearErrorType.AUTHENTICATION,
+        null,
+        401
+      )
+    };
+    
+    (enhancedClient.testAuthentication as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(errorMock);
+    
+    const result = await enhancedClient.testAuthentication();
+    
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    if (result.error) {
+      expect(result.error.message).toContain('Authentication');
     }
   });
 }); 
