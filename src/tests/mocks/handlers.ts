@@ -18,7 +18,6 @@ const MOCK_LABEL_ID_1 = '550e8400-e29b-41d4-a716-446655440000';
 const MOCK_LABEL_ID_2 = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 const EXISTING_LABEL_ID = '6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b';
 const MOCK_USER_ID = 'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6';
-const MOCK_NEW_LABEL_ID = '7f8e9d0c-1b2a-43c4-5d6e-7f8e9d0c1b2a';
 
 // Mock data
 const mockIssue = {
@@ -50,20 +49,6 @@ const mockUser = {
   email: 'test@example.com'
 };
 
-// Mock label data
-const mockLabel = {
-  id: MOCK_NEW_LABEL_ID,
-  name: 'Bug',
-  color: '#FF0000'
-};
-
-// Mock documentation label
-const mockDocLabel = {
-  id: MOCK_NEW_LABEL_ID,
-  name: 'Documentation',
-  color: '#000000'
-};
-
 // Handle all GraphQL requests to Linear API
 export const handlers = [
   http.post('https://api.linear.app/graphql', async ({ request }) => {
@@ -77,33 +62,6 @@ export const handlers = [
     } catch (error) {
       console.error('Error parsing request body:', error);
       return HttpResponse.json({ errors: [{ message: 'Invalid request body' }] }, { status: 400 });
-    }
-    
-    // Handle createIssueLabel mutation
-    if (body.query && body.query.includes('createIssueLabel')) {
-      console.log('Handling createIssueLabel mutation');
-      
-      // Check if this is the Documentation label case
-      if (body.variables && body.variables.name === 'Documentation') {
-        return HttpResponse.json<GraphQLResponse>({
-          data: {
-            issueLabelCreate: {
-              success: true,
-              issueLabel: mockDocLabel
-            }
-          }
-        });
-      }
-      
-      // Default label creation response
-      return HttpResponse.json<GraphQLResponse>({
-        data: {
-          issueLabelCreate: {
-            success: true,
-            issueLabel: mockLabel
-          }
-        }
-      });
     }
     
     // Handle authentication query (viewer)
@@ -153,14 +111,7 @@ export const mockIds = {
   MOCK_LABEL_ID_1,
   MOCK_LABEL_ID_2,
   EXISTING_LABEL_ID,
-  MOCK_USER_ID,
-  MOCK_NEW_LABEL_ID
-};
-
-// Export mock data for use in tests
-export const mockData = {
-  mockLabel,
-  mockDocLabel
+  MOCK_USER_ID
 };
 
 // Setup MSW server
