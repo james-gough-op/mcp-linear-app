@@ -1,3 +1,4 @@
+import { LinearAddIssueToCycleTool } from './add-issue-to-cycle.js';
 import { LinearApplyLabelsTool } from './apply-labels.js';
 import { LinearAssignIssueToProjectTool } from './assign-issue-to-project.js';
 import { LinearCreateCommentTool } from './create-comment.js';
@@ -14,8 +15,7 @@ import { LinearUpdateIssueTool } from './update-issue.js';
 
 // Re-export the tools
 export {
-    LinearApplyLabelsTool,
-    LinearAssignIssueToProjectTool,
+    LinearAddIssueToCycleTool, LinearApplyLabelsTool, LinearAssignIssueToProjectTool,
     LinearCreateCommentTool,
     LinearCreateIssueTool,
     LinearCreateLabelTool,
