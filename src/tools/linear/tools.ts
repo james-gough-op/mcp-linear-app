@@ -1,3 +1,4 @@
+import { LinearApplyLabelsTool } from './apply-labels.js';
 import { LinearCreateCommentTool } from './create-comment.js';
 import { LinearCreateIssueTool } from './create-issue.js';
 import { LinearCreateLabelTool } from './create-label.js';
@@ -11,5 +12,16 @@ import { LinearUpdateIssueTool } from './update-issue.js';
 
 // Re-export the tools
 export {
-    LinearCreateCommentTool, LinearCreateIssueTool, LinearCreateLabelTool, LinearGetCommentTool, LinearGetIssueTool, LinearGetProfileTool, LinearGetTeamIdTool, LinearSearchIssuesTool, LinearUpdateCommentTool, LinearUpdateIssueTool
+    LinearApplyLabelsTool,
+    LinearCreateCommentTool,
+    LinearCreateIssueTool,
+    LinearCreateLabelTool,
+    LinearGetCommentTool,
+    LinearGetIssueTool,
+    LinearGetProfileTool,
+    LinearGetTeamIdTool,
+    LinearSearchIssuesTool,
+    LinearUpdateCommentTool,
+    LinearUpdateIssueTool
 };
+
