@@ -8,9 +8,11 @@ const MOCK_ISSUE_ID = '550e8400-e29b-41d4-a716-446655440000';
 // Use a valid UUID v4 format for project ID to pass validation
 const MOCK_PROJECT_ID = '7f8e9d0c-1b2a-41d4-a716-446655440000';
 const MOCK_CYCLE_ID = '9a8b7c6d-5e4f-43d2-a1b2-c3d4e5f67890';
+const MOCK_TEMPLATE_ID = 'b5f8c1d2-e3f4-45a6-b7c8-9d0e1f2a3b4c';
 const MOCK_STATE_ID = 'abcdef12-3456-7890-abcd-ef1234567890';
 const INVALID_PROJECT_ID = 'not-a-valid-uuid';
 const INVALID_CYCLE_ID = 'not-a-valid-cycle-id';
+const INVALID_TEMPLATE_ID = 'not-a-valid-template-id';
 
 // Mock the LinearIdSchema and other imports before importing modules that use them
 vi.doMock('../libs/id-management.js', async () => {
@@ -19,11 +21,11 @@ vi.doMock('../libs/id-management.js', async () => {
   // Create the mock of our validation schema that passes our test IDs but still validates others
   const mockLinearIdSchema = {
     parse: vi.fn((value) => {
-      if ([MOCK_PROJECT_ID, MOCK_CYCLE_ID].includes(value)) {
+      if ([MOCK_PROJECT_ID, MOCK_CYCLE_ID, MOCK_TEMPLATE_ID].includes(value)) {
         return value;
       }
       
-      if ([INVALID_PROJECT_ID, INVALID_CYCLE_ID].includes(value)) {
+      if ([INVALID_PROJECT_ID, INVALID_CYCLE_ID, INVALID_TEMPLATE_ID].includes(value)) {
         throw new Error('Invalid Linear ID format. Linear IDs must be valid UUID v4 strings.');
       }
       
@@ -56,6 +58,7 @@ vi.doMock('../libs/id-management.js', async () => {
       ISSUE: 'issue',
       CYCLE: 'cycle',
       LABEL: 'label',
+      TEMPLATE: 'template',
     }
   };
 });
@@ -285,5 +288,99 @@ describe('LinearCreateIssueTool', () => {
     
     // Verify validation error response
     expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
+  });
+
+  it('should successfully create an issue with template', async () => {
+    // Mock successful issue creation with template
+    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+      success: true,
+      issue: Promise.resolve({
+        id: MOCK_ISSUE_ID,
+        title: "Test Issue from Template",
+        description: "This is a test issue created from a template"
+      } as any)
+    } as any);
+    
+    // Call the handler directly with templateId
+    const response = await LinearCreateIssueTool.handler({
+      teamId: MOCK_TEAM_ID,
+      title: "Test Issue from Template",
+      description: "This is a test issue created from a template",
+      templateId: MOCK_TEMPLATE_ID
+    }, { signal: new AbortController().signal });
+    
+    // Verify the response includes template information
+    expect(response.content).toBeDefined();
+    expect(response.content.length).toBe(1);
+    expect(response.content[0].type).toBe('text');
+    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain(`Template applied: ${MOCK_TEMPLATE_ID}`);
+  });
+  
+  it('should successfully create an issue with template, project, and cycle', async () => {
+    // Mock successful issue creation with template, project and cycle
+    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+      success: true,
+      issue: Promise.resolve({
+        id: MOCK_ISSUE_ID,
+        title: "Test Issue with Everything",
+        description: "This is a test issue with template, project, and cycle",
+        project: {
+          id: MOCK_PROJECT_ID,
+          name: "Test Project"
+        },
+        cycle: {
+          id: MOCK_CYCLE_ID,
+          name: "Sprint 42",
+          number: 42
+        }
+      } as any)
+    } as any);
+    
+    // Call the handler with all optional parameters
+    const response = await LinearCreateIssueTool.handler({
+      teamId: MOCK_TEAM_ID,
+      title: "Test Issue with Everything",
+      description: "This is a test issue with template, project, and cycle",
+      status: "in_progress",
+      priority: "high",
+      projectId: MOCK_PROJECT_ID,
+      cycleId: MOCK_CYCLE_ID,
+      templateId: MOCK_TEMPLATE_ID
+    }, { signal: new AbortController().signal });
+    
+    // Verify response includes all assignment information
+    expect(response.content).toBeDefined();
+    expect(response.content.length).toBe(1);
+    expect(response.content[0].type).toBe('text');
+    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain(`Assigned to Project ID: ${MOCK_PROJECT_ID}`);
+    expect(response.content[0].text).toContain(`Assigned to Cycle ID: ${MOCK_CYCLE_ID}`);
+    expect(response.content[0].text).toContain(`Template applied: ${MOCK_TEMPLATE_ID}`);
+    
+    // Verify createIssue was called with all parameters
+    expect(linearClient.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: MOCK_TEAM_ID,
+        title: "Test Issue with Everything",
+        description: "This is a test issue with template, project, and cycle",
+        projectId: MOCK_PROJECT_ID,
+        cycleId: MOCK_CYCLE_ID,
+        templateId: MOCK_TEMPLATE_ID
+      })
+    );
+  });
+  
+  it('should reject invalid templateId format', async () => {
+    // Test with an invalid templateId format
+    const response = await LinearCreateIssueTool.handler({
+      teamId: MOCK_TEAM_ID,
+      title: "Test Issue",
+      description: "This is a test issue",
+      templateId: INVALID_TEMPLATE_ID
+    }, { signal: new AbortController().signal });
+    
+    // Verify validation error response
+    expect(response.content[0].text).toContain('Validation error: templateId: Invalid Linear ID format');
   });
 }); 

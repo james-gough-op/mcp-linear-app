@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   Issue,
+  IssuePayload
 } from '../../generated/linear-types.js';
 import linearClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
@@ -43,20 +44,6 @@ export const PriorityStringToNumber: Record<string, number> = {
   'medium': LINEAR_ISSUE_PRIORITIES.MEDIUM,
   'low': LINEAR_ISSUE_PRIORITIES.LOW
 };
-
-// State string mappings have been replaced with a dynamic function 
-// that calls the Linear API to get valid state IDs
-
-/**
- * Interface for the create issue response
- */
-interface IssueCreateResponse {
-  success?: boolean;
-  issueCreate?: {
-    issue: Issue;
-    success: boolean;
-  };
-}
 
 /**
  * Format issue data into human-readable text
@@ -117,6 +104,16 @@ function formatIssueToHumanReadable(issue: Issue): string {
     result += `\n`;
   }
   
+  // Template information if exists
+  if (issue.lastAppliedTemplate) {
+    result += `--- TEMPLATE INFO ---\n`;
+    result += `TEMPLATE ID: ${issue.lastAppliedTemplate.id}\n`;
+    if (issue.lastAppliedTemplate.name) {
+      result += `TEMPLATE NAME: ${safeText(issue.lastAppliedTemplate.name)}\n`;
+    }
+    result += `\n`;
+  }
+  
   // Team information
   result += `--- TEAM INFO ---\n`;
   if (issue.team && issue.team.name) {
@@ -163,7 +160,8 @@ const createIssueSchema = z.object({
   ]).default("no_priority").describe("The priority of the issue"),
   parentId: z.string().describe("The ID of the parent issue, used to create a sub-issue").optional(),
   projectId: LinearIdSchema.optional().describe("The ID of the project to assign the issue to"),
-  cycleId: LinearIdSchema.optional().describe("The ID of the cycle to assign the issue to")
+  cycleId: LinearIdSchema.optional().describe("The ID of the cycle to assign the issue to"),
+  templateId: LinearIdSchema.optional().describe("The ID of the template to use for the issue")
 });
 
 /**
@@ -203,7 +201,7 @@ export const LinearCreateIssueTool = createSafeTool({
           return {
             content: [{
               type: "text",
-              text: `Error: Invalid project ID format. ${error instanceof Error ? error.message : 'Project ID must be a valid Linear ID'}`,
+              text: `Validation error: projectId: ${error instanceof Error ? error.message : 'Project ID must be a valid Linear ID'}`,
             }],
           };
         }
@@ -217,7 +215,21 @@ export const LinearCreateIssueTool = createSafeTool({
           return {
             content: [{
               type: "text",
-              text: `Error: Invalid cycle ID format. ${error instanceof Error ? error.message : 'Cycle ID must be a valid Linear ID'}`,
+              text: `Validation error: cycleId: ${error instanceof Error ? error.message : 'Cycle ID must be a valid Linear ID'}`,
+            }],
+          };
+        }
+      }
+      
+      // Validate templateId if provided
+      if (args.templateId) {
+        try {
+          LinearIdSchema.parse(args.templateId);
+        } catch (error) {
+          return {
+            content: [{
+              type: "text",
+              text: `Validation error: templateId: ${error instanceof Error ? error.message : 'Template ID must be a valid Linear ID'}`,
             }],
           };
         }
@@ -266,6 +278,7 @@ export const LinearCreateIssueTool = createSafeTool({
         parentId: args.parentId,
         projectId: args.projectId,
         cycleId: args.cycleId,
+        templateId: args.templateId,
       });
       
       if (!createIssueResponse) {
@@ -283,8 +296,8 @@ export const LinearCreateIssueTool = createSafeTool({
         // Access issue and get ID with correct data type
         const issue = await createIssueResponse.issue;
         if (issue && issue.id) {
-          // Include project and cycle info in success message if available
-          let additionalInfo = [];
+          // Include project, cycle, and template info in success message if available
+          const additionalInfo = [];
           
           if (args.projectId) {
             additionalInfo.push(`Assigned to Project ID: ${args.projectId}`);
@@ -292,6 +305,10 @@ export const LinearCreateIssueTool = createSafeTool({
           
           if (args.cycleId) {
             additionalInfo.push(`Assigned to Cycle ID: ${args.cycleId}`);
+          }
+          
+          if (args.templateId) {
+            additionalInfo.push(`Template applied: ${args.templateId}`);
           }
           
           const additionalInfoText = additionalInfo.length > 0 ? `\n${additionalInfo.join('\n')}` : '';
@@ -305,8 +322,8 @@ export const LinearCreateIssueTool = createSafeTool({
         }
       }
       
-      // Extract data from response - fix to handle proper response structure
-      const issueResponse = createIssueResponse as unknown as IssueCreateResponse;
+      // Extract data from response for other cases
+      const issueResponse = createIssueResponse as unknown as IssuePayload;
       
       // Check if the response follows the expected structure with success flag
       if (issueResponse.success === false) {
@@ -320,14 +337,14 @@ export const LinearCreateIssueTool = createSafeTool({
       
       // Extract issue data from the correct property
       const issueData: Issue = 
-        (issueResponse.issueCreate && issueResponse.issueCreate.issue) || 
+        (issueResponse.issue) || 
         (createIssueResponse as unknown as Issue);
       
       // Directly check the parsed response result
       const issueId = issueData?.id || (createIssueResponse as unknown as { id?: string })?.id;
       if (issueId) {
-        // Include project and cycle info in success message if available
-        let additionalInfo = [];
+        // Include project, cycle, and template info in success message if available
+        const additionalInfo = [];
         
         if (args.projectId) {
           additionalInfo.push(`Assigned to Project ID: ${args.projectId}`);
@@ -335,6 +352,10 @@ export const LinearCreateIssueTool = createSafeTool({
         
         if (args.cycleId) {
           additionalInfo.push(`Assigned to Cycle ID: ${args.cycleId}`);
+        }
+        
+        if (args.templateId) {
+          additionalInfo.push(`Template applied: ${args.templateId}`);
         }
         
         const additionalInfoText = additionalInfo.length > 0 ? `\n${additionalInfo.join('\n')}` : '';
@@ -370,8 +391,8 @@ export const LinearCreateIssueTool = createSafeTool({
       // Success case with ID available
       if (issueData.title === undefined && issueData.description === undefined) {
         // Only ID is available, without complete data
-        // Include project and cycle info in success message if available
-        let additionalInfo = [];
+        // Include project, cycle, and template info in success message if available
+        const additionalInfo = [];
         
         if (args.projectId) {
           additionalInfo.push(`Assigned to Project ID: ${args.projectId}`);
@@ -379,6 +400,10 @@ export const LinearCreateIssueTool = createSafeTool({
         
         if (args.cycleId) {
           additionalInfo.push(`Assigned to Cycle ID: ${args.cycleId}`);
+        }
+        
+        if (args.templateId) {
+          additionalInfo.push(`Template applied: ${args.templateId}`);
         }
         
         const additionalInfoText = additionalInfo.length > 0 ? `\n${additionalInfo.join('\n')}` : '';
