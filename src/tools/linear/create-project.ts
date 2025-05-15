@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { enhancedClient } from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { safeText } from '../../libs/utils.js';

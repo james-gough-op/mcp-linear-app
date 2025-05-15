@@ -1,5 +1,5 @@
 import { z } from "zod";
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
@@ -74,7 +74,7 @@ export const LinearAddIssueToCycleTool = createSafeTool({
         return {
           content: [{
             type: "text",
-            text: "Error: Issue ID cannot be empty",
+            text: "Validation error: issueId: Invalid Linear ID format. Linear IDs must be valid UUID v4 strings.",
           }],
         };
       }
@@ -83,7 +83,7 @@ export const LinearAddIssueToCycleTool = createSafeTool({
         return {
           content: [{
             type: "text",
-            text: "Error: Cycle ID cannot be empty",
+            text: "Validation error: cycleId: Invalid Linear ID format. Linear IDs must be valid UUID v4 strings.",
           }],
         };
       }
@@ -96,13 +96,13 @@ export const LinearAddIssueToCycleTool = createSafeTool({
         return {
           content: [{
             type: "text",
-            text: `Error: Invalid ID format. ${error instanceof Error ? error.message : 'IDs must be valid Linear ID format'}`,
+            text: `Validation error: ${error instanceof Error ? error.message : 'IDs must be valid Linear ID format'}`,
           }],
         };
       }
       
-      // Execute the mutation by using the client's raw request method
-      const response = await linearClient.client.rawRequest(
+      // Execute the mutation by using the enhanced client's mutation method
+      const response = await enhancedClient.executeGraphQLMutation<IssueUpdateResponse>(
         ADD_ISSUE_TO_CYCLE_MUTATION,
         {
           issueId: args.issueId,

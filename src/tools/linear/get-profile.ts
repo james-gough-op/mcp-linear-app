@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { User } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
 
@@ -63,7 +63,7 @@ export const LinearGetProfileTool = createSafeTool({
   handler: async () => {
     try {
       // Get user profile data
-      const profile = await linearClient.viewer;
+      const profile = await enhancedClient.viewer();
       
       if (!profile) {
         return {

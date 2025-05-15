@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Issue, WorkflowState } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
@@ -104,9 +104,10 @@ export const LinearSearchIssuesTool = createSafeTool({
       // Fetch issues with pagination - we need to request more to handle skiping
       // Linear API has a first parameter but no skip/offset parameter
       const maxFetch = skip + limit;
-      const getAllIssues = await linearClient.issues({
-        first: maxFetch,
-      });
+      const getAllIssues = await enhancedClient.issues(
+        {}, // Empty filter object
+        maxFetch // Pass maxFetch as the 'first' parameter
+      );
 
       if (!getAllIssues || !getAllIssues.nodes || getAllIssues.nodes.length === 0) {
         return {

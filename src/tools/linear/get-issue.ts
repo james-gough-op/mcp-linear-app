@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Comment, Issue, WorkflowState } from '../../generated/linear-types.js';
-import linearClient, { enhancedClient } from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
@@ -140,7 +140,7 @@ export const LinearGetIssueTool = createSafeTool({
       let comments: Comment[] = [];
       try {
         // Continue using legacy client for comments for now, as it has the method pattern
-        const legacyIssue = await linearClient.issue(args.issueId);
+        const legacyIssue = await enhancedClient.issue(args.issueId);
         const commentsQuery = await legacyIssue.comments();
         
         // Process and transform comments to a consistent format
@@ -190,7 +190,7 @@ export const LinearGetIssueTool = createSafeTool({
       let status: WorkflowState | null = null;
       try {
         // Continue using legacy client for state access
-        const legacyIssue = await linearClient.issue(args.issueId);
+        const legacyIssue = await enhancedClient.issue(args.issueId);
         const stateData = await legacyIssue.state;
         
         if (stateData) {
@@ -206,8 +206,8 @@ export const LinearGetIssueTool = createSafeTool({
       }
       
       // Access related issues through a different path or fetch them separately
-      // We might need to make a secondary query using linearClient
-      const legacyIssue = await linearClient.issue(args.issueId);
+      // We might need to make a secondary GraphQL query for more data
+      const legacyIssue = await enhancedClient.issue(args.issueId);
       const childIssuesQuery = await legacyIssue.children();
       
       // Fetch sub-issues with error handling
@@ -246,7 +246,7 @@ export const LinearGetIssueTool = createSafeTool({
         }
       } else {
         // Fallback to using old client for sub-issues
-        const legacyIssue = await linearClient.issue(args.issueId);
+        const legacyIssue = await enhancedClient.issue(args.issueId);
         const childIssuesQuery = await legacyIssue.children();
         
         if (childIssuesQuery && childIssuesQuery.nodes) {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import linearClient from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
+import { LinearResult } from '../libs/errors.js';
 import * as idManagement from '../libs/id-management.js';
 import { LinearAddIssueToCycleTool } from '../tools/linear/add-issue-to-cycle.js';
 
@@ -10,10 +11,8 @@ const INVALID_ID = 'not-a-valid-uuid';
 
 // Mock the GraphQL client response
 vi.mock('../libs/client.js', () => ({
-  default: {
-    client: {
-      rawRequest: vi.fn()
-    }
+  enhancedClient: {
+    executeGraphQLMutation: vi.fn()
   }
 }));
 
@@ -51,8 +50,8 @@ describe('LinearAddIssueToCycleTool', () => {
   });
 
   it('should successfully add an issue to a cycle', async () => {
-    // Mock the GraphQL client to return a successful response
-    vi.mocked(linearClient.client.rawRequest).mockResolvedValueOnce(successResponse);
+    // Mock the enhanced client to return a successful response
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(successResponse as LinearResult<unknown>);
 
     // Call the handler
     const response = await LinearAddIssueToCycleTool.handler({
@@ -61,7 +60,7 @@ describe('LinearAddIssueToCycleTool', () => {
     }, { signal: new AbortController().signal });
 
     // Verify client was called with correct parameters
-    expect(linearClient.client.rawRequest).toHaveBeenCalledWith(
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
       expect.stringContaining('issueUpdate'),
       {
         issueId: MOCK_ISSUE_ID,
@@ -77,8 +76,8 @@ describe('LinearAddIssueToCycleTool', () => {
   });
 
   it('should handle failed update from Linear API', async () => {
-    // Mock the GraphQL client to return a failed response
-    vi.mocked(linearClient.client.rawRequest).mockResolvedValueOnce(failedResponse);
+    // Mock the enhanced client to return a failed response
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(failedResponse as LinearResult<unknown>);
 
     // Call the handler
     const response = await LinearAddIssueToCycleTool.handler({
@@ -99,7 +98,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: issueId: Invalid Linear ID format');
-    expect(linearClient.client.rawRequest).not.toHaveBeenCalled();
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject empty cycleId', async () => {
@@ -111,7 +110,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
-    expect(linearClient.client.rawRequest).not.toHaveBeenCalled();
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject invalid issueId format', async () => {
@@ -129,7 +128,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: issueId: Invalid Linear ID format');
-    expect(linearClient.client.rawRequest).not.toHaveBeenCalled();
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject invalid cycleId format', async () => {
@@ -148,12 +147,12 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
-    expect(linearClient.client.rawRequest).not.toHaveBeenCalled();
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should handle API errors during the update', async () => {
     // Mock API error
-    vi.mocked(linearClient.client.rawRequest).mockRejectedValueOnce(
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockRejectedValueOnce(
       new Error('API Error: Cycle not found')
     );
     

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Comment } from '../../generated/linear-types.js';
-import linearClient, { enhancedClient } from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
 
@@ -73,9 +73,58 @@ export const LinearGetCommentTool = createSafeTool({
         };
       }
       
-      // Fetch comments for the issue (using legacy client for compatibility)
-      const legacyIssue = await linearClient.issue(args.issueId);
-      const comments = await legacyIssue.comments();
+      // Fetch comments for the issue
+      const query = `
+        query GetComments($issueId: String!) {
+          issue(id: $issueId) {
+            comments {
+              nodes {
+                id
+                body
+                createdAt
+                updatedAt
+                user {
+                  id
+                  name
+                  email
+                }
+              }
+            }
+          }
+        }
+      `;
+      
+      // Define the expected return type for our query
+      type CommentsQueryResponse = {
+        issue: {
+          comments: {
+            nodes: {
+              id: string;
+              body: string;
+              createdAt: string;
+              updatedAt: string;
+              user?: {
+                id: string;
+                name: string;
+                email: string;
+              } | null;
+            }[];
+          };
+        };
+      };
+      
+      const result = await enhancedClient.safeExecuteGraphQLQuery<CommentsQueryResponse>(query, { issueId: args.issueId });
+      
+      if (!result.success || !result.data?.issue?.comments?.nodes) {
+        return {
+          content: [{
+            type: "text",
+            text: `Error fetching comments: ${result.error?.message || "Unknown error"}`,
+          }],
+        };
+      }
+      
+      const comments = result.data.issue.comments;
       
       if (!comments || comments.nodes.length === 0) {
         return {
@@ -86,27 +135,16 @@ export const LinearGetCommentTool = createSafeTool({
         };
       }
       
-      // Process and format the comments
-      const commentsData = await Promise.all(comments.nodes.map(async (comment) => {
-        // Ensure we await the user object if it exists
-        let userData = null;
-        if (comment.user) {
-          const user = await comment.user;
-          userData = {
-            id: user.id,
-            name: user.name,
-            email: user.email
-          };
-        }
-        
+      // Convert GraphQL results to our Comment type
+      const commentsData = comments.nodes.map((comment) => {
         return {
           id: comment.id,
           body: comment.body,
           createdAt: comment.createdAt,
           updatedAt: comment.updatedAt,
-          user: userData
-        } as Comment;
-      }));
+          user: comment.user || null
+        } as unknown as Comment;
+      });
       
       // Format the response
       const formattedComments = formatCommentsToHumanReadable(commentsData);

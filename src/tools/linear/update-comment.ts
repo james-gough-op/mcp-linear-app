@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Comment } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
 /**
@@ -54,7 +54,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       // Handle delete operation if delete flag is true
       if (args.delete === true) {
         // Delete the comment
-        const deleteCommentResponse = await linearClient.deleteComment(args.commentId);
+        const deleteCommentResponse = await enhancedClient.deleteComment(args.commentId);
         
         if (!deleteCommentResponse) {
           return {
@@ -97,7 +97,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       }
       
       // Update the comment
-      const updateCommentResponse = await linearClient.updateComment(args.commentId, {
+      const updateCommentResponse = await enhancedClient.updateComment(args.commentId, {
         body: args.comment,
       });
       

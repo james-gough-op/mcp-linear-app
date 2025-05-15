@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 import {
     LinearError,
     LinearErrorType,

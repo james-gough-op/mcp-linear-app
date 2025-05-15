@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { IssueLabel } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { safeText } from '../../libs/utils.js';
@@ -87,7 +87,7 @@ export const LinearCreateLabelTool = createSafeTool({
       const color = args.color || "#000000"; // Default to black
       
       // Create the label using Linear SDK
-      const createLabelResponse = await linearClient.createIssueLabel({
+      const createLabelResponse = await enhancedClient.createIssueLabel({
         name: args.name,
         color: color,
         teamId: args.teamId

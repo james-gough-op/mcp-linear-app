@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Issue, IssueLabel } from '../../generated/linear-types.js';
-import linearClient, { enhancedClient } from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { safeText } from '../../libs/utils.js';
@@ -101,19 +101,46 @@ export const LinearApplyLabelsTool = createSafeTool({
         };
       }
       
-      // Retrieve current labels
-      // We need to use the legacy client for compatibility
-      const legacyIssue = await linearClient.issue(args.issueId);
-      const existingLabelsResult = await legacyIssue.labels();
-      const existingLabelIds = existingLabelsResult ? 
-        existingLabelsResult.nodes.map(label => label.id) : 
-        [];
+      // Query for the issue labels
+      const labelsQuery = `
+        query GetIssueLabels($issueId: String!) {
+          issue(id: $issueId) {
+            labels {
+              nodes {
+                id
+                name
+                color
+              }
+            }
+          }
+        }
+      `;
+      
+      // Define the return type for our query
+      type IssueLabelsResponse = {
+        issue: {
+          labels: {
+            nodes: {
+              id: string;
+              name: string;
+              color: string;
+            }[];
+          };
+        };
+      };
+      
+      const labelsResult = await enhancedClient.safeExecuteGraphQLQuery<IssueLabelsResponse>(labelsQuery, { issueId: args.issueId });
+      
+      // Get existing label IDs
+      const existingLabelIds = labelsResult.success && labelsResult.data?.issue?.labels?.nodes
+        ? labelsResult.data.issue.labels.nodes.map(label => label.id)
+        : [];
       
       // Combine existing labels with new labels, removing duplicates
       const combinedLabelIds = [...new Set([...existingLabelIds, ...args.labelIds])];
       
       // Update the issue with the combined labels
-      const updateResponse = await linearClient.updateIssue(args.issueId, {
+      const updateResponse = await enhancedClient.updateIssue(args.issueId, {
         labelIds: combinedLabelIds,
       });
       
@@ -129,16 +156,20 @@ export const LinearApplyLabelsTool = createSafeTool({
       // Get the updated issue with its labels
       const updatedIssue = await enhancedClient.issue(args.issueId);
       
-      // For compatibility, use legacy client to get labels
-      const legacyUpdatedIssue = await linearClient.issue(args.issueId);
-      const updatedLabelsResult = await legacyUpdatedIssue.labels();
+      // Query for updated labels
+      const updatedLabelsResult = await enhancedClient.safeExecuteGraphQLQuery<IssueLabelsResponse>(labelsQuery, { issueId: args.issueId });
+      
+      // Extract the labels
+      const labels = updatedLabelsResult.success && updatedLabelsResult.data?.issue?.labels?.nodes
+        ? updatedLabelsResult.data.issue.labels.nodes
+        : [];
       
       // Convert the issue and labels to the expected types
       const issueData: Issue = {
         id: updatedIssue.id,
         title: updatedIssue.title,
         labels: {
-          nodes: updatedLabelsResult ? updatedLabelsResult.nodes : []
+          nodes: labels
         }
       } as unknown as Issue;
       

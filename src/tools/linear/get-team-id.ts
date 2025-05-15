@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Team } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
 /**
@@ -35,7 +35,7 @@ export const LinearGetTeamIdTool = createSafeTool({
   handler: async () => {
     try {
       // Get teams from Linear
-      const teamsResponse = await linearClient.teams();
+      const teamsResponse = await enhancedClient.teams();
       
       if (!teamsResponse || !teamsResponse.nodes) {
         return {

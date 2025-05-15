@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
     Issue
 } from '../../generated/linear-types.js';
-import linearClient, { enhancedClient } from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
 
@@ -165,7 +165,7 @@ export const LinearUpdateIssueTool = createSafeTool({
         // Normalize the state name to handle different variations
         const normalizedStateName = normalizeStateName(args.status);
         // Get the actual state ID from Linear API
-        stateId = await getStateId(normalizedStateName, teamId, linearClient);
+        stateId = await getStateId(normalizedStateName, teamId);
         
         if (!stateId) {
           return {
@@ -178,7 +178,7 @@ export const LinearUpdateIssueTool = createSafeTool({
       }
       
       // Update the issue
-      const updateIssueResponse = await linearClient.updateIssue(args.id, {
+      const updateIssueResponse = await enhancedClient.updateIssue(args.id, {
         title: args.title,
         description: args.description,
         trashed: args.trashed,

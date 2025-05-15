@@ -1,9 +1,9 @@
 import { z } from "zod";
 import {
-  Issue,
-  IssuePayload
+    Issue,
+    IssuePayload
 } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
@@ -254,8 +254,8 @@ export const LinearCreateIssueTool = createSafeTool({
       if (args.status) {
         // Normalize the state name to handle different variations
         const normalizedStateName = normalizeStateName(args.status);
-        // Get the actual state ID from Linear API
-        stateId = await getStateId(normalizedStateName, args.teamId, linearClient);
+        // Get the actual state ID from Linear API using enhancedClient
+        stateId = await getStateId(normalizedStateName, args.teamId);
         
         if (!stateId) {
           return {
@@ -267,8 +267,8 @@ export const LinearCreateIssueTool = createSafeTool({
         }
       }
 
-      // Create the issue with SDK's own input type
-      const createIssueResponse = await linearClient.createIssue({
+      // Create the issue using the enhanced client
+      const createIssueResponse = await enhancedClient.createIssue({
         title: args.title,
         description: args.description,
         stateId: stateId,

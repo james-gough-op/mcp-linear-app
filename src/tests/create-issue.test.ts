@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import linearClient from '../libs/client.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IssueCreateInput } from '../generated/linear-types.js';
+import enhancedClient from '../libs/client.js';
+import { LinearError, LinearErrorType } from '../libs/errors.js';
 import * as utils from '../libs/utils.js';
+import {
+  createMockIssue,
+  MOCK_IDS
+} from './mocks/mock-data.js';
 
 // Mock UUIDs for testing - ensure they are valid UUID v4 format
 const MOCK_TEAM_ID = '123e4567-e89b-42d3-a456-556642440000';
@@ -68,7 +74,7 @@ import { LinearCreateIssueTool } from '../tools/linear/create-issue.js';
 
 // Mock the dependencies
 vi.mock('../libs/client.js', () => ({
-  default: {
+  enhancedClient: {
     createIssue: vi.fn()
   }
 }));
@@ -90,7 +96,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue without project or cycle', async () => {
     // Mock successful issue creation with a partial issue object
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -140,7 +146,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue with project assignment', async () => {
     // Mock successful issue creation with project
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -173,7 +179,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue with cycle assignment', async () => {
     // Mock successful issue creation with cycle
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -207,7 +213,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue with both project and cycle assignment', async () => {
     // Mock successful issue creation with both project and cycle
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -247,7 +253,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should handle API errors during issue creation', async () => {
     // Mock API error
-    vi.mocked(linearClient.createIssue).mockRejectedValueOnce(
+    vi.mocked(enhancedClient.createIssue).mockRejectedValueOnce(
       new Error('API Error: Project not found')
     );
     
@@ -292,7 +298,7 @@ describe('LinearCreateIssueTool', () => {
 
   it('should successfully create an issue with template', async () => {
     // Mock successful issue creation with template
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -319,7 +325,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue with template, project, and cycle', async () => {
     // Mock successful issue creation with template, project and cycle
-    vi.mocked(linearClient.createIssue).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce({
       success: true,
       issue: Promise.resolve({
         id: MOCK_ISSUE_ID,
@@ -359,7 +365,7 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content[0].text).toContain(`Template applied: ${MOCK_TEMPLATE_ID}`);
     
     // Verify createIssue was called with all parameters
-    expect(linearClient.createIssue).toHaveBeenCalledWith(
+    expect(enhancedClient.createIssue).toHaveBeenCalledWith(
       expect.objectContaining({
         teamId: MOCK_TEAM_ID,
         title: "Test Issue with Everything",
@@ -382,5 +388,191 @@ describe('LinearCreateIssueTool', () => {
     
     // Verify validation error response
     expect(response.content[0].text).toContain('Validation error: templateId: Invalid Linear ID format');
+  });
+});
+
+describe('enhancedClient.createIssue', () => {
+  // Setup mocks
+  beforeEach(() => {
+    // Clear all mocks
+    vi.clearAllMocks();
+    
+    // Simple spies without default implementations
+    vi.spyOn(enhancedClient, 'executeGraphQLMutation');
+    vi.spyOn(enhancedClient, 'createIssue');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Happy path
+  it('should return issue payload for valid input', async () => {
+    // Arrange
+    const mockIssue = createMockIssue();
+    const mockPayload = {
+      success: true,
+      issue: mockIssue
+    };
+    
+    (enhancedClient.safeExecuteGraphQLMutation as any).mockResolvedValueOnce({
+      data: { issueCreate: mockPayload }
+    });
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act
+    const result = await enhancedClient.createIssue(input);
+    
+    // Assert
+    expect(result).toEqual(mockPayload);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
+      expect.stringContaining('mutation CreateIssue'), 
+      { input }
+    );
+  });
+  
+  // Validation errors
+  it('should throw validation error for missing teamId', async () => {
+    // Arrange
+    const input = {
+      title: 'Test Issue'
+    } as IssueCreateInput; // Type assertion to bypass compiler check for test
+    
+    // Act & Assert
+    await expect(enhancedClient.createIssue(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.createIssue(input)).rejects.toMatchObject({
+      type: LinearErrorType.VALIDATION,
+      message: expect.stringContaining('Team ID is required')
+    });
+    
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+  });
+  
+  it('should throw validation error for missing title', async () => {
+    // Arrange
+    const input = {
+      teamId: MOCK_IDS.TEAM
+    } as IssueCreateInput; // Type assertion to bypass compiler check for test
+    
+    // Act & Assert
+    await expect(enhancedClient.createIssue(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.createIssue(input)).rejects.toMatchObject({
+      type: LinearErrorType.VALIDATION,
+      message: expect.stringContaining('Title is required')
+    });
+    
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+  });
+  
+  // API error case
+  it('should pass through LinearError from GraphQL execution', async () => {
+    // Arrange
+    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
+    (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act & Assert
+    await expect(enhancedClient.createIssue(input)).rejects.toThrow(apiError);
+  });
+  
+  // Unknown error case
+  it('should convert unknown errors to LinearError', async () => {
+    // Arrange
+    (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(new Error('Unknown error'));
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act & Assert
+    await expect(enhancedClient.createIssue(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.createIssue(input)).rejects.toMatchObject({
+      type: LinearErrorType.UNKNOWN,
+      message: expect.stringContaining('Error creating issue')
+    });
+  });
+});
+
+describe('enhancedClient.safeCreateIssue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(enhancedClient, 'createIssue');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return success result for valid input', async () => {
+    // Arrange
+    const mockIssue = createMockIssue();
+    const mockPayload = {
+      success: true,
+      issue: mockIssue
+    };
+    
+    vi.mocked(enhancedClient.createIssue).mockResolvedValueOnce(mockPayload as any);
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act
+    const result = await enhancedClient.safeCreateIssue(input);
+    
+    // Assert
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockPayload);
+    expect(enhancedClient.createIssue).toHaveBeenCalledWith(input);
+  });
+  
+  it('should return error result when createIssue throws LinearError', async () => {
+    // Arrange
+    const linearError = new LinearError('Validation error', LinearErrorType.VALIDATION);
+    vi.mocked(enhancedClient.createIssue).mockRejectedValueOnce(linearError);
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act
+    const result = await enhancedClient.safeCreateIssue(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error!.message).toContain('Validation error');
+    expect(result.error!.type).toBe(LinearErrorType.VALIDATION);
+  });
+  
+  it('should return error result when createIssue throws non-LinearError', async () => {
+    // Arrange
+    vi.mocked(enhancedClient.createIssue).mockRejectedValueOnce(new Error('Unknown error'));
+    
+    const input: IssueCreateInput = {
+      teamId: MOCK_IDS.TEAM,
+      title: 'Test Issue'
+    };
+    
+    // Act
+    const result = await enhancedClient.safeCreateIssue(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.error!.message).toContain('Unknown error');
+    expect(result.error!.type).toBe(LinearErrorType.UNKNOWN);
   });
 }); 

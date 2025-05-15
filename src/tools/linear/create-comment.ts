@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   Comment
 } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
 /**
@@ -54,7 +54,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       // Create the comment
-      const createCommentResponse = await linearClient.createComment({
+      const createCommentResponse = await enhancedClient.createComment({
         body: args.comment,
         issueId: args.issueId,
       });

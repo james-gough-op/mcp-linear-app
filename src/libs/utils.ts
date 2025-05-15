@@ -82,25 +82,26 @@ const stateIdCache: Record<string, Record<string, string>> = {};
  * 
  * @param stateName The name of the state (triage, backlog, todo, in_progress, done, canceled)
  * @param teamId The ID of the team
- * @param linearClient The Linear client instance
  * @returns Promise with the state ID or undefined if not found
  */
-export async function getStateId(stateName: string, teamId: string, linearClient: import('@linear/sdk').LinearClient): Promise<string | undefined> {
+export async function getStateId(stateName: string, teamId: string): Promise<string | undefined> {
   // Check if we have a cached state ID for this team
   if (stateIdCache[teamId] && stateIdCache[teamId][stateName]) {
     return stateIdCache[teamId][stateName];
   }
   
   try {
-    // Get workflow states for the team
-    const team = await linearClient.team(teamId);
+    // Import enhancedClient for GraphQL implementation
+    const { enhancedClient } = await import('./client.js');
+    const team = await enhancedClient.team(teamId);
+    
     if (!team) {
       console.error(`Team with ID ${teamId} not found`);
       return undefined;
     }
     
-    const states = await team.states();
-    if (!states || states.nodes.length === 0) {
+    const states = team.states?.nodes || [];
+    if (!states || states.length === 0) {
       console.error(`No workflow states found for team ${teamId}`);
       return undefined;
     }
@@ -112,7 +113,7 @@ export async function getStateId(stateName: string, teamId: string, linearClient
     
     // Find the state by name and populate the cache while we're at it
     let targetStateId: string | undefined;
-    for (const state of states.nodes) {
+    for (const state of states) {
       const normalizedName = state.name.toLowerCase().replace(/\s+/g, '_');
       stateIdCache[teamId][normalizedName] = state.id;
       

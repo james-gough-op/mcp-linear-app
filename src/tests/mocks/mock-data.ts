@@ -9,14 +9,14 @@
  * Mock IDs - using UUID v4 format following Linear's pattern
  */
 export const MOCK_IDS = {
-  ISSUE: 'iss_ca8f7971-3831-4e80-b7ae-ebafcbe3bd4f',
-  COMMENT: 'com_2b30b2c6-8d72-4b4a-b5c5-5c7ae7944bd9',
-  TEAM: 'tea_8d872b4a-b5c5-5c7a-e794-4bd97ea8f79c',
-  PROJECT: 'pro_7ea8f79c-8d87-2b4a-b5c5-5c7ae7944bd9',
-  CYCLE: 'cyc_5c7ae794-4bd9-7ea8-f79c-8d872b4ab5c5',
-  USER: 'usr_b5c55c7a-e794-4bd9-7ea8-f79c8d872b4a',
-  LABEL: 'lab_4bd97ea8-f79c-8d87-2b4a-b5c55c7ae794',
-  STATE: 'wst_f79c8d87-2b4a-b5c5-5c7a-e7944bd97ea8'
+  ISSUE: '550e8400-e29b-41d4-a716-446655440000',
+  COMMENT: '550e8400-e29b-41d4-a716-446655440001',
+  TEAM: '550e8400-e29b-41d4-a716-446655440002',
+  PROJECT: '550e8400-e29b-41d4-a716-446655440003',
+  CYCLE: '550e8400-e29b-41d4-a716-446655440004',
+  USER: '550e8400-e29b-41d4-a716-446655440005',
+  LABEL: '550e8400-e29b-41d4-a716-446655440006',
+  STATE: '550e8400-e29b-41d4-a716-446655440007'
 };
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 
 /**
  * Tests for the enhanced Linear client
@@ -96,7 +96,7 @@ describe('Linear GraphQL Client', () => {
       // Test the formatting capability
       const mockResponse = testExecuteGraphQLMutation(mockMutation, mockVariables);
       
-      expect(mockResponse).toBeTruthy();
+      expect(mockResponse as LinearResult<unknown>).toBeTruthy();
       expect(mockResponse.data).toBeTruthy();
       expect(typeof mockResponse.data).toBe('object');
       expect('issueCreate' in mockResponse.data).toBe(true);

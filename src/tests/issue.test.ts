@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import {
-  createMockIssue,
-  MOCK_IDS
+    createMockIssue,
+    MOCK_IDS
 } from './mocks/mock-data.js';
 
 // Setup mocks

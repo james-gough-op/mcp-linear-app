@@ -47,7 +47,7 @@ export class TestEntityTracker {
     const comments = this.entities.get('comments') || [];
     for (const commentId of comments) {
       try {
-        await enhancedClient.executeGraphQLMutation(
+        await enhancedClient.safeExecuteGraphQLMutation(
           `mutation DeleteComment($id: String!) {
             commentDelete(id: $id) {
               success
@@ -65,7 +65,7 @@ export class TestEntityTracker {
     const issues = this.entities.get('issues') || [];
     for (const issueId of issues) {
       try {
-        await enhancedClient.executeGraphQLMutation(
+        await enhancedClient.safeExecuteGraphQLMutation(
           `mutation ArchiveIssue($id: String!) {
             issueArchive(id: $id) {
               success
@@ -83,7 +83,7 @@ export class TestEntityTracker {
     const labels = this.entities.get('labels') || [];
     for (const labelId of labels) {
       try {
-        await enhancedClient.executeGraphQLMutation(
+        await enhancedClient.safeExecuteGraphQLMutation(
           `mutation DeleteLabel($id: String!) {
             labelDelete(id: $id) {
               success
@@ -101,7 +101,7 @@ export class TestEntityTracker {
     const cycles = this.entities.get('cycles') || [];
     for (const cycleId of cycles) {
       try {
-        await enhancedClient.executeGraphQLMutation(
+        await enhancedClient.safeExecuteGraphQLMutation(
           `mutation ArchiveCycle($id: String!) {
             cycleArchive(id: $id) {
               success
@@ -119,7 +119,7 @@ export class TestEntityTracker {
     const projects = this.entities.get('projects') || [];
     for (const projectId of projects) {
       try {
-        await enhancedClient.executeGraphQLMutation(
+        await enhancedClient.safeExecuteGraphQLMutation(
           `mutation ArchiveProject($id: String!) {
             projectArchive(id: $id) {
               success

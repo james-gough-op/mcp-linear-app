@@ -6,17 +6,17 @@
  */
 
 import {
-  Issue,
-  Team
+    Issue,
+    Team
 } from '../generated/linear-types.js';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import {
-  CreateIssueSchema,
-  LinearEntityType,
-  validateLinearId,
-  validateLinearIds,
-  validateTeamId
+    CreateIssueSchema,
+    LinearEntityType,
+    validateLinearId,
+    validateLinearIds,
+    validateTeamId
 } from '../libs/id-management.js';
 
 // Custom response type definitions using generated entity types

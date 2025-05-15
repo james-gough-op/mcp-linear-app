@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 import { LinearCreateProjectTool } from '../tools/linear/create-project.js';
 
 // Mock UUIDs for testing
@@ -45,8 +45,8 @@ describe('LinearCreateProjectTool', () => {
     }, { signal: new AbortController().signal });
 
     // Verify GraphQL mutation was called with correct parameters
-    expect(enhancedClient.executeGraphQLMutation).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.executeGraphQLMutation).toHaveBeenCalledWith(
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
       expect.stringContaining('projectCreate'),
       expect.objectContaining({
         name: "Test Project",
