@@ -24,10 +24,11 @@ const mockProjectResponse = {
 
 describe('LinearCreateProjectTool', () => {
   beforeEach(() => {
-    // Mock the GraphQL client
-    vi.spyOn(enhancedClient, 'executeGraphQLMutation').mockImplementation(async () => {
-      return mockProjectResponse;
-    });
+    // Clear all mocks
+    vi.clearAllMocks();
+    
+    // Set up spy for executeGraphQLMutation
+    vi.spyOn(enhancedClient, 'executeGraphQLMutation');
   });
 
   afterEach(() => {
@@ -35,34 +36,48 @@ describe('LinearCreateProjectTool', () => {
   });
 
   it('should successfully create a project', async () => {
-    // Call the handler
-    const response = await LinearCreateProjectTool.handler({
-      name: "Test Project",
-      description: "Test project description",
-      teamIds: [MOCK_TEAM_ID],
-      color: "#FF5500",
-      state: "backlog"
-    }, { signal: new AbortController().signal });
-
-    // Verify GraphQL mutation was called with correct parameters
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
-      expect.stringContaining('projectCreate'),
-      expect.objectContaining({
+    // Store original method
+    const originalExecute = enhancedClient.executeGraphQLMutation;
+    
+    // Create mock function
+    const mockExecute = vi.fn().mockResolvedValue(mockProjectResponse);
+    
+    // Replace with mock implementation
+    enhancedClient.executeGraphQLMutation = mockExecute;
+    
+    try {
+      // Call the handler
+      const response = await LinearCreateProjectTool.handler({
         name: "Test Project",
         description: "Test project description",
         teamIds: [MOCK_TEAM_ID],
         color: "#FF5500",
-        state: "backlog"  // state should be lowercase as defined in our enum
-      })
-    );
-
-    // Check response format
-    expect(response.content).toBeDefined();
-    expect(response.content.length).toBe(1);
-    expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('LINEAR PROJECT CREATED');
-    expect(response.content[0].text).toContain('Test Project');
+        state: "backlog"
+      }, { signal: new AbortController().signal });
+  
+      // Verify GraphQL mutation was called with correct parameters
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('projectCreate'),
+        expect.objectContaining({
+          name: "Test Project",
+          description: "Test project description",
+          teamIds: [MOCK_TEAM_ID],
+          color: "#FF5500",
+          state: "backlog"  // state should be lowercase as defined in our enum
+        })
+      );
+  
+      // Check response format
+      expect(response.content).toBeDefined();
+      expect(response.content.length).toBe(1);
+      expect(response.content[0].type).toBe('text');
+      expect(response.content[0].text).toContain('LINEAR PROJECT CREATED');
+      expect(response.content[0].text).toContain('Test Project');
+    } finally {
+      // Restore original method
+      enhancedClient.executeGraphQLMutation = originalExecute;
+    }
   });
 
   it('should return an error when project name is empty', async () => {

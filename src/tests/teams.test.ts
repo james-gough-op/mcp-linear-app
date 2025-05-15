@@ -1,11 +1,12 @@
+import { LinearDocument } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamConnection, TeamFilter } from '../generated/linear-types.js';
+import { TeamFilter } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock teams response
-function createMockTeamsConnection(): TeamConnection {
+function createMockTeamsConnection(): LinearDocument.TeamConnection {
   return {
     nodes: [
       {
@@ -24,7 +25,7 @@ function createMockTeamsConnection(): TeamConnection {
       startCursor: 'cursor1',
       endCursor: 'cursor1'
     }
-  } as unknown as TeamConnection;
+  } as unknown as LinearDocument.TeamConnection;
 }
 
 // Setup spies
@@ -46,7 +47,7 @@ describe('enhancedClient.teams', () => {
     // Arrange
     const mockTeams = createMockTeamsConnection();
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
       data: { teams: mockTeams }
     });
     
@@ -70,7 +71,7 @@ describe('enhancedClient.teams', () => {
       name: { contains: 'Test' }
     };
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
       data: { teams: mockTeams }
     });
     
@@ -89,7 +90,7 @@ describe('enhancedClient.teams', () => {
   it('should propagate API errors', async () => {
     // Arrange
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    (enhancedClient.executeGraphQLQuery as any).mockRejectedValueOnce(apiError);
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
     
     // Act & Assert
     await expect(enhancedClient.teams()).rejects.toThrow(apiError);

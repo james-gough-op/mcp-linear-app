@@ -1,10 +1,11 @@
+import { LinearDocument } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IssueUpdateInput } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import {
-    createMockIssue,
-    MOCK_IDS
+  createMockIssue,
+  MOCK_IDS
 } from './mocks/mock-data.js';
 
 // Setup spies
@@ -20,6 +21,7 @@ beforeEach(() => {
   
   // Simple spies without default implementations
   vi.spyOn(enhancedClient, 'executeGraphQLMutation');
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLMutation');
 });
 
 afterEach(() => {
@@ -37,7 +39,9 @@ describe('enhancedClient.updateIssue', () => {
       lastSyncId: 123456 // Add necessary property for IssuePayload
     };
     
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockResolvedValueOnce({
+    // Use vi.mocked instead of type casting
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce({
+      success: true,
       data: { issueUpdate: mockPayload }
     });
     
@@ -46,15 +50,16 @@ describe('enhancedClient.updateIssue', () => {
     };
     
     // Act
-    const result = await enhancedClient.updateIssue(MOCK_IDS.ISSUE, input);
+    const result = await enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
     
     // Assert
     expect(result).toEqual(mockPayload);
     expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
-      expect.stringContaining('mutation UpdateIssue'), 
-      { id: MOCK_IDS.ISSUE, input }
-    );
+    
+    // Verify the function was called with the expected query and variables
+    const callArgs = vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mock.calls[0];
+    expect(callArgs[0]).toContain('mutation UpdateIssue');
+    expect(callArgs[1]).toEqual({ id: MOCK_IDS.ISSUE, input });
   });
   
   // Validation errors - we now rely on mock validation
@@ -86,7 +91,7 @@ describe('enhancedClient.updateIssue', () => {
     
     // Act & Assert
     try {
-      await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input)).rejects.toThrow(emptyInputError);
+      await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(emptyInputError);
       expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
     } finally {
       // Restore the original method after the test
@@ -105,7 +110,7 @@ describe('enhancedClient.updateIssue', () => {
     };
     
     // Act & Assert
-    await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input)).rejects.toThrow(apiError);
+    await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(apiError);
   });
 });
 
@@ -121,14 +126,15 @@ describe('enhancedClient.safeUpdateIssue', () => {
     };
     
     // Spy on updateIssue which is used internally by safeUpdateIssue
-    vi.spyOn(enhancedClient, 'updateIssue').mockResolvedValueOnce(mockPayload);
+    // Use unknown as an intermediate step for safer type casting
+    vi.spyOn(enhancedClient, 'updateIssue').mockResolvedValueOnce(mockPayload as unknown as LinearDocument.IssuePayload);
     
     const input: IssueUpdateInput = {
       title: 'Updated Issue Title'
     };
     
     // Act
-    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input);
+    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
     
     // Assert
     expect(result.success).toBe(true);
@@ -147,7 +153,7 @@ describe('enhancedClient.safeUpdateIssue', () => {
     };
     
     // Act
-    const result = await enhancedClient.safeUpdateIssue('invalid-id', input);
+    const result = await enhancedClient.safeUpdateIssue('invalid-id', input as LinearDocument.IssueUpdateInput);
     
     // Assert
     expect(result.success).toBe(false);
@@ -166,7 +172,7 @@ describe('enhancedClient.safeUpdateIssue', () => {
     };
     
     // Act
-    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input);
+    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
     
     // Assert
     expect(result.success).toBe(false);

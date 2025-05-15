@@ -1,18 +1,19 @@
+import { LinearDocument } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient, Team } from '../libs/client.js';
+import { enhancedClient } from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock team
-function createMockTeam(): Team {
+function createMockTeam(): LinearDocument.Team {
   return {
     id: MOCK_IDS.TEAM,
     name: 'Test Team',
     key: 'TST',
     description: 'Test team description',
     color: '#FF5500',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     private: false,
     icon: '🚀',
     states: {
@@ -24,8 +25,8 @@ function createMockTeam(): Team {
           type: 'started'
         }
       ]
-    }
-  };
+    } as LinearDocument.WorkflowStateConnection
+  } as LinearDocument.Team;
 }
 
 // Setup spies
@@ -47,7 +48,7 @@ describe('enhancedClient.team', () => {
     // Arrange
     const mockTeam = createMockTeam();
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
       data: { team: mockTeam }
     });
     
@@ -79,12 +80,12 @@ describe('enhancedClient.team', () => {
   // Not found error
   it('should throw not found error when team does not exist', async () => {
     // Arrange
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
       data: { team: null }
     });
     
     // Create a spy to bypass validation to test NOT_FOUND case
-    const validateSpy = vi.spyOn(enhancedClient as any, 'team').mockImplementationOnce(async () => {
+    vi.spyOn(enhancedClient, 'team').mockImplementationOnce(async () => {
       // Simulate the validateLinearId call passing but the GraphQL response returning null
       const notFoundError = new LinearError(
         `Team with ID ${MOCK_IDS.TEAM} not found`,
@@ -104,7 +105,7 @@ describe('enhancedClient.team', () => {
   it('should propagate API errors', async () => {
     // Arrange
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    (enhancedClient.executeGraphQLQuery as any).mockRejectedValueOnce(apiError);
+    vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
     
     // Act & Assert
     await expect(enhancedClient.team(MOCK_IDS.TEAM)).rejects.toThrow(apiError);
@@ -118,7 +119,7 @@ describe('enhancedClient.safeTeam', () => {
     const mockTeam = createMockTeam();
     
     // Spy on team which is used internally by safeTeam
-    vi.spyOn(enhancedClient, 'team').mockResolvedValueOnce(mockTeam);
+    vi.spyOn(enhancedClient, 'team').mockResolvedValueOnce(mockTeam as LinearDocument.Team);
     
     // Act
     const result = await enhancedClient.safeTeam(MOCK_IDS.TEAM);

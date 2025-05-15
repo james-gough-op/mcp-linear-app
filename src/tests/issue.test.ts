@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import {
-    createMockIssue,
-    MOCK_IDS
+  createMockIssue,
+  MOCK_IDS
 } from './mocks/mock-data.js';
 
 // Setup mocks
@@ -13,103 +13,139 @@ beforeEach(() => {
   
   // Simple spies without default implementations
   vi.spyOn(enhancedClient, 'executeGraphQLQuery');
-  vi.spyOn(enhancedClient, 'issue');
+  vi.spyOn(enhancedClient, '_getIssue');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.issue', () => {
+describe('enhancedClient._getIssue', () => {
   // Happy path
   it('should return issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
     
-    // Directly mock the issue method to return our mock data
-    (enhancedClient.issue as any).mockResolvedValueOnce(mockIssue);
+    // Temporarily replace the method with a mock function
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockResolvedValue(mockIssue);
     
-    // Act
-    const result = await enhancedClient.issue(MOCK_IDS.ISSUE);
-    
-    // Assert
-    expect(result).toEqual(mockIssue);
+    try {
+      // Act
+      const result = await enhancedClient._getIssue(MOCK_IDS.ISSUE);
+      
+      // Assert
+      expect(result).toEqual(mockIssue);
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
   
   // Error cases
   it('should throw validation error for invalid ID format', async () => {
     // Arrange
-    enhancedClient.issue.mockRejectedValueOnce(
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockRejectedValue(
       new LinearError('Invalid ID', LinearErrorType.VALIDATION)
     );
     
-    // Act & Assert
-    await expect(enhancedClient.issue('invalid-id')).rejects.toThrow(LinearError);
+    try {
+      // Act & Assert
+      await expect(enhancedClient._getIssue('invalid-id')).rejects.toThrow(LinearError);
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
   
   // More tests...
 });
 
-describe('enhancedClient.safeIssue', () => {
+describe('enhancedClient.safeGetIssue', () => {
   // Happy path
   it('should return success result with issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
-    (enhancedClient.issue as any).mockResolvedValueOnce(mockIssue);
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockResolvedValue(mockIssue);
     
-    // Act
-    const result = await enhancedClient.safeIssue(MOCK_IDS.ISSUE);
-    
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockIssue);
-    expect(enhancedClient.issue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
+    try {
+      // Act
+      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockIssue);
+      expect(enhancedClient._getIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
   
   // Error case for validation error
   it('should return error result for invalid ID', async () => {
     // Arrange
     const validationError = new LinearError('Invalid ID', LinearErrorType.VALIDATION);
-    (enhancedClient.issue as any).mockRejectedValueOnce(validationError);
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockRejectedValue(validationError);
     
-    // Act
-    const result = await enhancedClient.safeIssue('invalid-id');
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(validationError);
-    expect(result.data).toBeUndefined();
+    try {
+      // Act
+      const result = await enhancedClient.safeGetIssue('invalid-id');
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(validationError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
   
   // Error case for not found
   it('should return error result for not found issue', async () => {
     // Arrange
     const notFoundError = new LinearError('Issue not found', LinearErrorType.NOT_FOUND);
-    (enhancedClient.issue as any).mockRejectedValueOnce(notFoundError);
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockRejectedValue(notFoundError);
     
-    // Act
-    const result = await enhancedClient.safeIssue(MOCK_IDS.ISSUE);
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(notFoundError);
-    expect(result.data).toBeUndefined();
+    try {
+      // Act
+      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(notFoundError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
   
   // Unknown error conversion
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
     const unknownError = new Error('Some unexpected error');
-    (enhancedClient.issue as any).mockRejectedValueOnce(unknownError);
+    const originalMethod = enhancedClient._getIssue;
+    enhancedClient._getIssue = vi.fn().mockRejectedValue(unknownError);
     
-    // Act
-    const result = await enhancedClient.safeIssue(MOCK_IDS.ISSUE);
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toBeInstanceOf(LinearError);
-    expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-    expect(result.error?.message).toContain('Some unexpected error');
-    expect(result.data).toBeUndefined();
+    try {
+      // Act
+      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeInstanceOf(LinearError);
+      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
+      expect(result.error?.message).toContain('Some unexpected error');
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._getIssue = originalMethod;
+    }
   });
 }); 

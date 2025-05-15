@@ -1,10 +1,11 @@
+import { LinearDocument } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { User, enhancedClient } from '../libs/client.js';
+import { enhancedClient } from '../libs/client.js';
 import { LinearError, LinearErrorType } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock user
-function createMockUser(): User {
+function createMockUser(): LinearDocument.User {
   return {
     id: MOCK_IDS.USER,
     name: 'Test User',
@@ -13,24 +14,28 @@ function createMockUser(): User {
     active: true,
     admin: true,
     avatarUrl: 'https://example.com/avatar.png',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    lastSeen: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSeen: new Date(),
     organization: {
-      id: 'org_123',
+      id: MOCK_IDS.ORGANIZATION,
       name: 'Test Organization',
-      urlKey: 'test-org'
-    },
+      urlKey: 'test-org',
+      allowedAuthServices: [],
+      createdAt: new Date(),
+      createdIssueCount: 0,
+      customerCount: 0,
+    } as unknown as LinearDocument.Organization,
     teams: {
       nodes: [
         {
           id: MOCK_IDS.TEAM,
           name: 'Test Team',
           key: 'TST'
-        }
+        } as unknown as LinearDocument.Team
       ]
-    }
-  };
+    } as unknown as LinearDocument.TeamConnection
+  } as unknown as LinearDocument.User;
 }
 
 // Setup spies
@@ -40,6 +45,7 @@ beforeEach(() => {
   
   // Simple spies without default implementations
   vi.spyOn(enhancedClient, 'executeGraphQLQuery');
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
 });
 
 afterEach(() => {
@@ -52,81 +58,65 @@ describe('enhancedClient.viewer', () => {
     // Arrange
     const mockUser = createMockUser();
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
+      success: true,
       data: { viewer: mockUser }
     });
     
     // Act
-    const result = await enhancedClient.viewer();
-    
-    // Assert
-    expect(result).toEqual(mockUser);
-    expect(enhancedClient.executeGraphQLQuery).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.executeGraphQLQuery).toHaveBeenCalledWith(
-      expect.stringContaining('query Viewer')
-    );
-  });
-  
-  // Authentication error
-  it('should throw authentication error when viewer is not available', async () => {
-    // Arrange
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
-      data: { viewer: null }
-    });
-    
-    // Mock implementation to return authentication error
-    vi.spyOn(enhancedClient as any, 'viewer').mockImplementationOnce(async () => {
-      const authError = new LinearError(
-        'User not authenticated',
-        LinearErrorType.AUTHENTICATION
-      );
-      throw authError;
-    });
-    
-    // Act & Assert
-    await expect(enhancedClient.viewer()).rejects.toThrow(LinearError);
-    await expect(enhancedClient.viewer()).rejects.toMatchObject({
-      type: LinearErrorType.AUTHENTICATION
-    });
-  });
-  
-  // Error from API
-  it('should propagate API errors', async () => {
-    // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    (enhancedClient.executeGraphQLQuery as any).mockRejectedValueOnce(apiError);
-    
-    // Act & Assert
-    await expect(enhancedClient.viewer()).rejects.toThrow(apiError);
-  });
-});
-
-describe('enhancedClient.safeViewer', () => {
-  // Happy path
-  it('should return success result with user data for valid request', async () => {
-    // Arrange
-    const mockUser = createMockUser();
-    
-    // Spy on viewer which is used internally by safeViewer
-    vi.spyOn(enhancedClient, 'viewer').mockResolvedValueOnce(mockUser);
-    
-    // Act
-    const result = await enhancedClient.safeViewer();
+    const result = await enhancedClient.safeGetViewer();
     
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockUser);
-    expect(enhancedClient.viewer).toHaveBeenCalled();
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledTimes(1);
+    
+    // Just verify the function was called with a query containing the expected keywords
+    const callArgs = vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mock.calls[0];
+    expect(callArgs[0]).toContain('query Viewer');
+    expect(callArgs[0]).toContain('viewer');
   });
   
-  // Error case
-  it('should return error result when viewer throws an error', async () => {
+  // Authentication error
+  it('should return authentication error when viewer is not available', async () => {
     // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'viewer').mockRejectedValueOnce(apiError);
+    const authError = new LinearError(
+      'User not authenticated',
+      LinearErrorType.AUTHENTICATION
+    );
+    
+    // Mock the safeExecuteGraphQLQuery to return a failed result
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
+      success: false,
+      error: authError,
+      data: undefined
+    });
     
     // Act
-    const result = await enhancedClient.safeViewer();
+    const result = await enhancedClient.safeGetViewer();
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toMatchObject({
+      type: LinearErrorType.AUTHENTICATION
+    });
+    expect(result.data).toBeUndefined();
+  });
+  
+  // Error from API
+  it('should handle API errors gracefully', async () => {
+    // Arrange
+    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
+    
+    // Mock safeExecuteGraphQLQuery to return a failed result
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
+      success: false,
+      error: apiError,
+      data: undefined
+    });
+    
+    // Act
+    const result = await enhancedClient.safeGetViewer();
     
     // Assert
     expect(result.success).toBe(false);

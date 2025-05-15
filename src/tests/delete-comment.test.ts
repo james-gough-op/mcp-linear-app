@@ -19,6 +19,7 @@ beforeEach(() => {
   
   // Simple spies without default implementations
   vi.spyOn(enhancedClient, 'executeGraphQLMutation');
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLMutation');
 });
 
 afterEach(() => {
@@ -32,20 +33,30 @@ describe('enhancedClient.deleteComment', () => {
     const commentId = MOCK_IDS.COMMENT;
     const mockResponse = createMockSuccessResponse();
     
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockResolvedValueOnce({
+    // Store original method
+    const originalMethod = enhancedClient.executeGraphQLMutation;
+    
+    // Create mock function and replace original
+    const mockExecute = vi.fn().mockResolvedValue({
       data: { commentDelete: mockResponse }
     });
+    enhancedClient.executeGraphQLMutation = mockExecute;
     
-    // Act
-    const result = await enhancedClient.deleteComment(commentId);
-    
-    // Assert
-    expect(result).toEqual(mockResponse as LinearResult<unknown>);
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
-      expect.stringContaining('mutation DeleteComment'),
-      { id: commentId }
-    );
+    try {
+      // Act
+      const result = await enhancedClient.deleteComment(commentId);
+      
+      // Assert
+      expect(result).toEqual(mockResponse);
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('mutation DeleteComment'),
+        { id: commentId }
+      );
+    } finally {
+      // Restore original method
+      enhancedClient.executeGraphQLMutation = originalMethod;
+    }
   });
   
   // Validation error
@@ -65,14 +76,23 @@ describe('enhancedClient.deleteComment', () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
     
-    // Mock implementation to return a network error
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(
+    // Store original method
+    const originalMethod = enhancedClient.executeGraphQLMutation;
+    
+    // Create mock function that returns a rejected promise
+    const mockExecute = vi.fn().mockRejectedValue(
       new LinearError('Entity not found: Comment', LinearErrorType.NOT_FOUND)
     );
+    enhancedClient.executeGraphQLMutation = mockExecute;
     
-    // Act & Assert
-    await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(/Entity not found: Comment/);
+    try {
+      // Act & Assert
+      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(LinearError);
+      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(/Entity not found: Comment/);
+    } finally {
+      // Restore original method
+      enhancedClient.executeGraphQLMutation = originalMethod;
+    }
   });
   
   // Missing response data
@@ -80,13 +100,22 @@ describe('enhancedClient.deleteComment', () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
     
-    // Mock implementation to return an error about missing data
-    vi.spyOn(enhancedClient as any, 'deleteComment').mockImplementationOnce(async () => {
-      throw new LinearError('Failed to delete comment', LinearErrorType.UNKNOWN);
-    });
+    // Store original method
+    const originalMethod = enhancedClient.deleteComment;
     
-    // Act & Assert
-    await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow('Failed to delete comment');
+    // Create mock implementation
+    const mockDeleteComment = vi.fn().mockRejectedValue(
+      new LinearError('Failed to delete comment', LinearErrorType.UNKNOWN)
+    );
+    enhancedClient.deleteComment = mockDeleteComment;
+    
+    try {
+      // Act & Assert
+      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow('Failed to delete comment');
+    } finally {
+      // Restore original method
+      enhancedClient.deleteComment = originalMethod;
+    }
   });
 });
 
@@ -97,16 +126,25 @@ describe('enhancedClient.safeDeleteComment', () => {
     const commentId = MOCK_IDS.COMMENT;
     const mockResponse = createMockSuccessResponse();
     
-    // Spy on deleteComment which is used internally by safeDeleteComment
-    vi.spyOn(enhancedClient, 'deleteComment').mockResolvedValueOnce(mockResponse as LinearResult<unknown>);
+    // Store original method
+    const originalMethod = enhancedClient.deleteComment;
     
-    // Act
-    const result = await enhancedClient.safeDeleteComment(commentId);
+    // Create mock function
+    const mockDeleteComment = vi.fn().mockResolvedValue(mockResponse);
+    enhancedClient.deleteComment = mockDeleteComment;
     
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockResponse as LinearResult<unknown>);
-    expect(enhancedClient.deleteComment).toHaveBeenCalledWith(commentId);
+    try {
+      // Act
+      const result = await enhancedClient.safeDeleteComment(commentId);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockResponse);
+      expect(mockDeleteComment).toHaveBeenCalledWith(commentId);
+    } finally {
+      // Restore original method
+      enhancedClient.deleteComment = originalMethod;
+    }
   });
   
   // Error case
@@ -114,15 +152,26 @@ describe('enhancedClient.safeDeleteComment', () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'deleteComment').mockRejectedValueOnce(apiError);
     
-    // Act
-    const result = await enhancedClient.safeDeleteComment(commentId);
+    // Store original method
+    const originalMethod = enhancedClient.deleteComment;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
+    // Create mock function
+    const mockDeleteComment = vi.fn().mockRejectedValue(apiError);
+    enhancedClient.deleteComment = mockDeleteComment;
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeDeleteComment(commentId);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(apiError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient.deleteComment = originalMethod;
+    }
   });
   
   // Unknown error
@@ -130,16 +179,27 @@ describe('enhancedClient.safeDeleteComment', () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
     const unknownError = new Error('Some unexpected error');
-    vi.spyOn(enhancedClient, 'deleteComment').mockRejectedValueOnce(unknownError);
     
-    // Act
-    const result = await enhancedClient.safeDeleteComment(commentId);
+    // Store original method
+    const originalMethod = enhancedClient.deleteComment;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toBeInstanceOf(LinearError);
-    expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-    expect(result.error?.message).toContain('Some unexpected error');
-    expect(result.data).toBeUndefined();
+    // Create mock function
+    const mockDeleteComment = vi.fn().mockRejectedValue(unknownError);
+    enhancedClient.deleteComment = mockDeleteComment;
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeDeleteComment(commentId);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeInstanceOf(LinearError);
+      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
+      expect(result.error?.message).toContain('Some unexpected error');
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient.deleteComment = originalMethod;
+    }
   });
 }); 
