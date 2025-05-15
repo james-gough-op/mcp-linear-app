@@ -13,49 +13,49 @@ beforeEach(() => {
   
   // Simple spies without default implementations
   vi.spyOn(enhancedClient, 'executeGraphQLQuery');
-  vi.spyOn(enhancedClient, '_getIssue');
+  vi.spyOn(enhancedClient, 'safeGetIssue');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient._getIssue', () => {
+describe('enhancedClient.safeGetIssue', () => {
   // Happy path
   it('should return issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
     
     // Temporarily replace the method with a mock function
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockResolvedValue(mockIssue);
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockResolvedValue(mockIssue);
     
     try {
       // Act
-      const result = await enhancedClient._getIssue(MOCK_IDS.ISSUE);
+      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
       
       // Assert
       expect(result).toEqual(mockIssue);
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
   
   // Error cases
   it('should throw validation error for invalid ID format', async () => {
     // Arrange
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockRejectedValue(
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(
       new LinearError('Invalid ID', LinearErrorType.VALIDATION)
     );
     
     try {
       // Act & Assert
-      await expect(enhancedClient._getIssue('invalid-id')).rejects.toThrow(LinearError);
+      await expect(enhancedClient.safeGetIssue('invalid-id')).rejects.toThrow(LinearError);
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
   
@@ -67,8 +67,8 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return success result with issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockResolvedValue(mockIssue);
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockResolvedValue(mockIssue);
     
     try {
       // Act
@@ -77,10 +77,10 @@ describe('enhancedClient.safeGetIssue', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockIssue);
-      expect(enhancedClient._getIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
+      expect(enhancedClient.safeGetIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
   
@@ -88,8 +88,8 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return error result for invalid ID', async () => {
     // Arrange
     const validationError = new LinearError('Invalid ID', LinearErrorType.VALIDATION);
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockRejectedValue(validationError);
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(validationError);
     
     try {
       // Act
@@ -101,7 +101,7 @@ describe('enhancedClient.safeGetIssue', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
   
@@ -109,8 +109,8 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return error result for not found issue', async () => {
     // Arrange
     const notFoundError = new LinearError('Issue not found', LinearErrorType.NOT_FOUND);
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockRejectedValue(notFoundError);
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(notFoundError);
     
     try {
       // Act
@@ -122,7 +122,7 @@ describe('enhancedClient.safeGetIssue', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
   
@@ -130,8 +130,8 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
     const unknownError = new Error('Some unexpected error');
-    const originalMethod = enhancedClient._getIssue;
-    enhancedClient._getIssue = vi.fn().mockRejectedValue(unknownError);
+    const originalMethod = enhancedClient.safeGetIssue;
+    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(unknownError);
     
     try {
       // Act
@@ -145,7 +145,7 @@ describe('enhancedClient.safeGetIssue', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._getIssue = originalMethod;
+      enhancedClient.safeGetIssue = originalMethod;
     }
   });
 }); 

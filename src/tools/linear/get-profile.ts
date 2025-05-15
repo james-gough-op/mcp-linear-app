@@ -63,7 +63,7 @@ export const LinearGetProfileTool = createSafeTool({
   handler: async () => {
     try {
       // Get user profile data
-      const profile = await enhancedClient.viewer();
+      const profile = await enhancedClient.safeGetViewer();
       
       if (!profile) {
         return {

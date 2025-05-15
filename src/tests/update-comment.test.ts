@@ -42,7 +42,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.updateComment', () => {
+describe('enhancedClient.safeUpdateComment', () => {
   // Happy path
   it('should update a comment successfully', async () => {
     // Arrange
@@ -53,23 +53,23 @@ describe('enhancedClient.updateComment', () => {
     };
     
     // To avoid the internal Linear API calls, mock the updateComment method directly
-    const originalUpdateComment = enhancedClient._updateComment;
-    enhancedClient._updateComment = vi.fn().mockResolvedValueOnce(mockPayload);
+    const originalUpdateComment = enhancedClient.safeUpdateComment;
+    enhancedClient.safeUpdateComment = vi.fn().mockResolvedValueOnce(mockPayload);
     
     try {
       // Act
-      const result = await enhancedClient._updateComment(commentId, input);
+      const result = await enhancedClient.safeUpdateComment(commentId, input);
       
       // Assert
       expect(result).toEqual(mockPayload);
       
       // We can't verify the call args for safeExecuteGraphQLMutation because we've bypassed it
       // but we can verify updateComment was called
-      expect(enhancedClient._updateComment).toHaveBeenCalledTimes(1);
-      expect(enhancedClient._updateComment).toHaveBeenCalledWith(commentId, input);
+      expect(enhancedClient.safeUpdateComment).toHaveBeenCalledTimes(1);
+      expect(enhancedClient.safeUpdateComment).toHaveBeenCalledWith(commentId, input);
     } finally {
       // Restore original method
-      enhancedClient._updateComment = originalUpdateComment;
+      enhancedClient.safeUpdateComment = originalUpdateComment;
     }
   });
   
@@ -82,8 +82,8 @@ describe('enhancedClient.updateComment', () => {
     };
     
     // Act & Assert
-    await expect(enhancedClient._updateComment(invalidCommentId, input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._updateComment(invalidCommentId, input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeUpdateComment(invalidCommentId, input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeUpdateComment(invalidCommentId, input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
   });
@@ -95,8 +95,8 @@ describe('enhancedClient.updateComment', () => {
     const input: CommentUpdateInput = {};
     
     // Act & Assert
-    await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._updateComment(commentId, input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeUpdateComment(commentId, input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeUpdateComment(commentId, input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
   });
@@ -121,8 +121,8 @@ describe('enhancedClient.updateComment', () => {
     
     try {
       // Act & Assert
-      await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(LinearError);
-      await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(expectedError);
+      await expect(enhancedClient.safeUpdateComment(commentId, input)).rejects.toThrow(LinearError);
+      await expect(enhancedClient.safeUpdateComment(commentId, input)).rejects.toThrow(expectedError);
     } finally {
       // Restore original method
       enhancedClient.safeExecuteGraphQLMutation = originalMethod;
@@ -148,7 +148,7 @@ describe('enhancedClient.updateComment', () => {
     
     try {
       // Act & Assert - use rejects for async functions
-      await expect(enhancedClient._updateComment(commentId, input))
+      await expect(enhancedClient.safeUpdateComment(commentId, input))
         .rejects.toThrow(LinearError);
     } finally {
       // Restore original method
@@ -168,8 +168,8 @@ describe('enhancedClient.safeUpdateComment', () => {
     };
     
     // Temporarily replace method with a mock function
-    const originalMethod = enhancedClient._updateComment;
-    enhancedClient._updateComment = vi.fn().mockResolvedValue(mockPayload);
+    const originalMethod = enhancedClient.safeUpdateComment;
+    enhancedClient.safeUpdateComment = vi.fn().mockResolvedValue(mockPayload);
     
     try {
       // Act
@@ -178,10 +178,10 @@ describe('enhancedClient.safeUpdateComment', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockPayload);
-      expect(enhancedClient._updateComment).toHaveBeenCalledWith(commentId, input);
+      expect(enhancedClient.safeUpdateComment).toHaveBeenCalledWith(commentId, input);
     } finally {
       // Restore original method
-      enhancedClient._updateComment = originalMethod;
+      enhancedClient.safeUpdateComment = originalMethod;
     }
   });
   
@@ -196,10 +196,10 @@ describe('enhancedClient.safeUpdateComment', () => {
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
     
     // Store original method
-    const originalMethod = enhancedClient._updateComment;
+    const originalMethod = enhancedClient.safeUpdateComment;
     
     // Mock the _updateComment method to throw the API error
-    enhancedClient._updateComment = vi.fn().mockRejectedValueOnce(apiError);
+    enhancedClient.safeUpdateComment = vi.fn().mockRejectedValueOnce(apiError);
     
     try {
       // Act
@@ -211,7 +211,7 @@ describe('enhancedClient.safeUpdateComment', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._updateComment = originalMethod;
+      enhancedClient.safeUpdateComment = originalMethod;
     }
   });
   
@@ -226,10 +226,10 @@ describe('enhancedClient.safeUpdateComment', () => {
     const unknownError = new Error('Some unexpected error');
     
     // Store original method
-    const originalMethod = enhancedClient._updateComment;
+    const originalMethod = enhancedClient.safeUpdateComment;
     
     // Mock _updateComment to throw the unknown error
-    enhancedClient._updateComment = vi.fn().mockRejectedValueOnce(unknownError);
+    enhancedClient.safeUpdateComment = vi.fn().mockRejectedValueOnce(unknownError);
     
     try {
       // Act
@@ -243,7 +243,7 @@ describe('enhancedClient.safeUpdateComment', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._updateComment = originalMethod;
+      enhancedClient.safeUpdateComment = originalMethod;
     }
   });
 }); 

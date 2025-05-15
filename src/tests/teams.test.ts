@@ -41,7 +41,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.teams', () => {
+describe('enhancedClient.safeTeams', () => {
   // Happy path
   it('should fetch teams successfully', async () => {
     // Arrange
@@ -52,7 +52,7 @@ describe('enhancedClient.teams', () => {
     });
     
     // Act
-    const result = await enhancedClient._teams();
+    const result = await enhancedClient.safeTeams();
     
     // Assert
     expect(result).toEqual(mockTeams);
@@ -76,7 +76,7 @@ describe('enhancedClient.teams', () => {
     });
     
     // Act
-    const result = await enhancedClient._teams(filter);
+    const result = await enhancedClient.safeTeams(filter);
     
     // Assert
     expect(result).toEqual(mockTeams);
@@ -93,7 +93,7 @@ describe('enhancedClient.teams', () => {
     vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient._teams()).rejects.toThrow(apiError);
+    await expect(enhancedClient.safeTeams()).rejects.toThrow(apiError);
   });
 });
 
@@ -104,10 +104,10 @@ describe('enhancedClient.safeTeams', () => {
     const mockTeams = createMockTeamsConnection();
     
     // Store original method
-    const originalMethod = enhancedClient._teams;
+    const originalMethod = enhancedClient.safeTeams;
     
     // Mock the _teams method which is used internally by safeTeams
-    enhancedClient._teams = vi.fn().mockResolvedValueOnce(mockTeams);
+    enhancedClient.safeTeams = vi.fn().mockResolvedValueOnce(mockTeams);
     
     try {
       // Act
@@ -116,10 +116,10 @@ describe('enhancedClient.safeTeams', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockTeams);
-      expect(enhancedClient._teams).toHaveBeenCalled();
+      expect(enhancedClient.safeTeams).toHaveBeenCalled();
     } finally {
       // Restore original method
-      enhancedClient._teams = originalMethod;
+      enhancedClient.safeTeams = originalMethod;
     }
   });
   
@@ -129,10 +129,10 @@ describe('enhancedClient.safeTeams', () => {
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
     
     // Store original method
-    const originalMethod = enhancedClient._teams;
+    const originalMethod = enhancedClient.safeTeams;
     
     // Mock the _teams method to throw an error
-    enhancedClient._teams = vi.fn().mockRejectedValueOnce(apiError);
+    enhancedClient.safeTeams = vi.fn().mockRejectedValueOnce(apiError);
     
     try {
       // Act
@@ -144,7 +144,7 @@ describe('enhancedClient.safeTeams', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient._teams = originalMethod;
+      enhancedClient.safeTeams = originalMethod;
     }
   });
 }); 

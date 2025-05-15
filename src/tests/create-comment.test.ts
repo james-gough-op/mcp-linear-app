@@ -42,7 +42,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.createComment', () => {
+describe('enhancedClient.safeCreatComment', () => {
   // Happy path
   it('should create a comment successfully', async () => {
     // Arrange
@@ -57,7 +57,7 @@ describe('enhancedClient.createComment', () => {
     });
     
     // Act
-    const result = await enhancedClient._createComment(input);
+    const result = await enhancedClient.safeCreateComment(input);
     
     // Assert
     expect(result).toEqual(mockPayload);
@@ -76,8 +76,8 @@ describe('enhancedClient.createComment', () => {
     } as CommentCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -91,8 +91,8 @@ describe('enhancedClient.createComment', () => {
     } as CommentCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -107,8 +107,8 @@ describe('enhancedClient.createComment', () => {
     };
     
     // Act & Assert
-    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('enhancedClient.createComment', () => {
     (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient._createComment(input)).rejects.toThrow(apiError);
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(apiError);
   });
   
   // Response validation error
@@ -142,8 +142,8 @@ describe('enhancedClient.createComment', () => {
     });
     
     // Act & Assert
-    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
       type: LinearErrorType.UNKNOWN
     });
   });
@@ -168,7 +168,7 @@ describe('enhancedClient.safeCreateComment', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient._createComment).toHaveBeenCalledWith(input);
+    expect(enhancedClient.safeCreateComment).toHaveBeenCalledWith(input);
   });
   
   // Error case - LinearError

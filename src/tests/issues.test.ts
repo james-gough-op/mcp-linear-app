@@ -36,7 +36,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.issues', () => {
+describe('enhancedClient.safeIssues', () => {
   // Happy path
   it('should return issue connection for valid filter', async () => {
     // Arrange
@@ -52,7 +52,7 @@ describe('enhancedClient.issues', () => {
     };
     
     // Act
-    const result = await enhancedClient._issues(filter, 50);
+    const result = await enhancedClient.safeIssues(filter, 50);
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -73,7 +73,7 @@ describe('enhancedClient.issues', () => {
     });
     
     // Act
-    const result = await enhancedClient._issues();
+    const result = await enhancedClient.safeIssues();
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -90,7 +90,7 @@ describe('enhancedClient.issues', () => {
     (enhancedClient.executeGraphQLQuery as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient._issues()).rejects.toThrow(apiError);
+    await expect(enhancedClient.safeIssues()).rejects.toThrow(apiError);
   });
   
   // Error case - Invalid response format
@@ -106,8 +106,8 @@ describe('enhancedClient.issues', () => {
     });
     
     // Act & Assert
-    await expect(enhancedClient._issues()).rejects.toThrow(LinearError);
-    await expect(enhancedClient._issues()).rejects.toThrow('Failed to fetch issues');
+    await expect(enhancedClient.safeIssues()).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeIssues()).rejects.toThrow('Failed to fetch issues');
   });
 });
 
@@ -134,7 +134,7 @@ describe('enhancedClient.safeIssues', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockIssuesConnection);
-    expect(enhancedClient._issues).toHaveBeenCalledWith(filter, 50, undefined);
+    expect(enhancedClient.safeIssues).toHaveBeenCalledWith(filter, 50, undefined);
   });
   
   // Error case - API error

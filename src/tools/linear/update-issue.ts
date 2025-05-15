@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-    Issue
+  Issue
 } from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
@@ -151,9 +151,9 @@ export const LinearUpdateIssueTool = createSafeTool({
       // Get the issue to update to retrieve its team ID
       let teamId: string | undefined;
       try {
-        const issueResponse = await enhancedClient.issue(args.id);
+        const issueResponse = await enhancedClient.safeGetIssue(args.id);
         if (issueResponse) {
-          teamId = issueResponse.team?.id;
+          teamId = issueResponse.data?.team?.id;
         }
       } catch (error) {
         console.error("Error fetching issue for team ID:", error);

@@ -53,7 +53,7 @@ describe('enhancedClient.createIssueLabel', () => {
     });
     
     // Act
-    const result = await enhancedClient._createIssueLabel(input);
+    const result = await enhancedClient.safeCreateIssueLabel(input);
     
     // Assert
     expect(result).toEqual(mockPayload);
@@ -73,8 +73,8 @@ describe('enhancedClient.createIssueLabel', () => {
     } as IssueLabelCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createIssueLabel(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateIssueLabel(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateIssueLabel(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -89,8 +89,8 @@ describe('enhancedClient.createIssueLabel', () => {
     } as IssueLabelCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient._createIssueLabel(input)).rejects.toMatchObject({
+    await expect(enhancedClient.safeCreateIssueLabel(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient.safeCreateIssueLabel(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('enhancedClient.createIssueLabel', () => {
     (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(apiError);
+    await expect(enhancedClient.safeCreateIssueLabel(input)).rejects.toThrow(apiError);
   });
 });
 
@@ -133,7 +133,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient._createIssueLabel).toHaveBeenCalledWith(input);
+    expect(enhancedClient.safeCreateIssueLabel).toHaveBeenCalledWith(input);
   });
   
   // Error case - LinearError

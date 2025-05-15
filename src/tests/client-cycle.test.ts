@@ -7,9 +7,9 @@ vi.mock('../libs/client.js', () => ({
   enhancedClient: {
     executeGraphQLQuery: vi.fn(),
     executeGraphQLMutation: vi.fn(),
-    cycle: vi.fn(),
-    cycles: vi.fn(),
-    addIssueToCycle: vi.fn()
+    safeCycle: vi.fn(),
+    safeCycles: vi.fn(),
+    safeAddIssueToCycle: vi.fn()
   }
 }));
 
@@ -38,9 +38,9 @@ describe('Cycle Management Methods', () => {
         }
       };
 
-      vi.mocked(enhancedClient._cycle).mockResolvedValueOnce(mockResponse.data.cycle as any);
+      vi.mocked(enhancedClient.safeCycle).mockResolvedValueOnce(mockResponse.data.cycle as any);
 
-      const result = await enhancedClient._cycle('cyc_123');
+      const result = await enhancedClient.safeCycle('cyc_123');
       
       expect(result).toEqual(mockResponse.data.cycle);
     });
@@ -52,9 +52,9 @@ describe('Cycle Management Methods', () => {
         undefined
       );
       
-      vi.mocked(enhancedClient._cycle).mockRejectedValueOnce(error);
+      vi.mocked(enhancedClient.safeCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient._cycle('')).rejects.toMatchObject({
+      await expect(enhancedClient.safeCycle('')).rejects.toMatchObject({
         message: 'Cycle ID cannot be empty',
         type: LinearErrorType.VALIDATION
       });
@@ -67,9 +67,9 @@ describe('Cycle Management Methods', () => {
         undefined
       );
 
-      vi.mocked(enhancedClient._cycle).mockRejectedValueOnce(error);
+      vi.mocked(enhancedClient.safeCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient._cycle('cyc_123')).rejects.toMatchObject({
+      await expect(enhancedClient.safeCycle('cyc_123')).rejects.toMatchObject({
         message: 'Cycle with ID cyc_123 not found',
         type: LinearErrorType.NOT_FOUND
       });
@@ -102,9 +102,9 @@ describe('Cycle Management Methods', () => {
         }
       };
 
-      vi.mocked(enhancedClient._cycles).mockResolvedValueOnce(mockResponse.data.cycles as any);
+      vi.mocked(enhancedClient.safeCycles).mockResolvedValueOnce(mockResponse.data.cycles as any);
 
-      const result = await enhancedClient._cycles();
+      const result = await enhancedClient.safeCycles();
       
       expect(result).toEqual(mockResponse.data.cycles);
     });
@@ -131,9 +131,9 @@ describe('Cycle Management Methods', () => {
         }
       };
 
-      vi.mocked(enhancedClient._addIssueToCycle).mockResolvedValueOnce(mockResponse.data.issueUpdate as any);
+      vi.mocked(enhancedClient.safeAddIssueToCycle).mockResolvedValueOnce(mockResponse.data.issueUpdate as any);
 
-      const result = await enhancedClient._addIssueToCycle('issue_123', 'cyc_123');
+      const result = await enhancedClient.safeAddIssueToCycle('issue_123', 'cyc_123');
       
       expect(result).toEqual(mockResponse.data.issueUpdate);
     });
@@ -145,9 +145,9 @@ describe('Cycle Management Methods', () => {
         undefined
       );
       
-      vi.mocked(enhancedClient._addIssueToCycle).mockRejectedValueOnce(error);
+      vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient._addIssueToCycle('', 'cyc_123')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle('', 'cyc_123')).rejects.toMatchObject({
         message: 'Issue ID cannot be empty',
         type: LinearErrorType.VALIDATION
       });
@@ -160,9 +160,9 @@ describe('Cycle Management Methods', () => {
         undefined
       );
       
-      vi.mocked(enhancedClient._addIssueToCycle).mockRejectedValueOnce(error);
+      vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient._addIssueToCycle('issue_123', '')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle('issue_123', '')).rejects.toMatchObject({
         message: 'Cycle ID cannot be empty',
         type: LinearErrorType.VALIDATION
       });
@@ -175,9 +175,9 @@ describe('Cycle Management Methods', () => {
         undefined
       );
 
-      vi.mocked(enhancedClient._addIssueToCycle).mockRejectedValueOnce(error);
+      vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient._addIssueToCycle('issue_123', 'cyc_123')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle('issue_123', 'cyc_123')).rejects.toMatchObject({
         message: 'Failed to add issue to cycle',
         type: LinearErrorType.UNKNOWN
       });
