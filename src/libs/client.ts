@@ -474,7 +474,7 @@ const enhancedClient = {
    * @throws {LinearError} With VALIDATION type if required fields are missing
    * @throws {LinearError} With various types for API errors
    */
-  async createIssue(input: LinearDocument.IssueCreateInput): Promise<LinearDocument.IssuePayload> {
+  async _createIssue(input: LinearDocument.IssueCreateInput): Promise<LinearDocument.IssuePayload> {
     try {
       // 1. Validate required parameters
       if (!input.teamId) {
@@ -620,7 +620,7 @@ const enhancedClient = {
    */
   async safeCreateIssue(input: LinearDocument.IssueCreateInput): Promise<LinearResult<LinearDocument.IssuePayload>> {
     try {
-      const result = await this.createIssue(input);
+      const result = await this._createIssue(input);
       return createSuccessResult<LinearDocument.IssuePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -647,7 +647,7 @@ const enhancedClient = {
    * @throws {LinearError} With NOT_FOUND type if issue doesn't exist
    * @throws {LinearError} With various types for API errors
    */
-  async updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearDocument.IssuePayload> {
+  async _updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearDocument.IssuePayload> {
     try {
       // 1. Validate the issue ID
       validateLinearId(id, LinearEntityType.ISSUE);
@@ -789,7 +789,7 @@ const enhancedClient = {
    */
   async safeUpdateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearResult<LinearDocument.IssuePayload>> {
     try {
-      const result = await this.updateIssue(id, input);
+      const result = await this._updateIssue(id, input);
       return createSuccessResult<LinearDocument.IssuePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -816,7 +816,7 @@ const enhancedClient = {
    * @throws {LinearError} With VALIDATION type if filter is invalid
    * @throws {LinearError} With various types for API errors
    */
-  async issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearDocument.IssueConnection> {
+  async _issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearDocument.IssueConnection> {
     try {
       // Define GraphQL query with all required fields
       const query = `
@@ -923,7 +923,7 @@ const enhancedClient = {
    */
   async safeIssues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearResult<LinearDocument.IssueConnection>> {
     try {
-      const result = await this.issues(filter, first, after);
+      const result = await this._issues(filter, first, after);
       return createSuccessResult<LinearDocument.IssueConnection>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -948,7 +948,7 @@ const enhancedClient = {
    * @throws {LinearError} With VALIDATION type if required fields are missing
    * @throws {LinearError} With various types for API errors
    */
-  async createComment(input: LinearDocument.CommentCreateInput): Promise<LinearDocument.CommentPayload> {
+  async _createComment(input: LinearDocument.CommentCreateInput): Promise<LinearDocument.CommentPayload> {
     try {
       // 1. Validate required parameters
       if (!input.issueId && !input.documentContentId && !input.projectUpdateId && !input.initiativeUpdateId && !input.postId) {
@@ -1040,7 +1040,7 @@ const enhancedClient = {
    */
   async safeCreateComment(input: LinearDocument.CommentCreateInput): Promise<LinearResult<LinearDocument.CommentPayload>> {
     try {
-      const result = await this.createComment(input);
+      const result = await this._createComment(input);
       return createSuccessResult<LinearDocument.CommentPayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1067,7 +1067,7 @@ const enhancedClient = {
    * @throws {LinearError} With NOT_FOUND type if comment doesn't exist
    * @throws {LinearError} With various types for API errors
    */
-  async updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearDocument.CommentPayload> {
+  async _updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearDocument.CommentPayload> {
     try {
       // 1. Validate the comment ID
       validateLinearId(id, LinearEntityType.COMMENT);
@@ -1150,7 +1150,7 @@ const enhancedClient = {
    */
   async safeUpdateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearResult<LinearDocument.CommentPayload>> {
     try {
-      const result = await this.updateComment(id, input);
+      const result = await this._updateComment(id, input);
       return createSuccessResult<LinearDocument.CommentPayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1176,7 +1176,7 @@ const enhancedClient = {
    * @throws {LinearError} With NOT_FOUND type if comment doesn't exist
    * @throws {LinearError} With various types for API errors
    */
-  async deleteComment(id: string): Promise<LinearDocument.DeletePayload> {
+  async _deleteComment(id: string): Promise<LinearDocument.DeletePayload> {
     try {
       // 1. Validate the comment ID
       validateLinearId(id, LinearEntityType.COMMENT);
@@ -1235,7 +1235,7 @@ const enhancedClient = {
    */
   async safeDeleteComment(id: string): Promise<LinearResult<LinearDocument.DeletePayload>> {
     try {
-      const result = await this.deleteComment(id);
+      const result = await this._deleteComment(id);
       return createSuccessResult<LinearDocument.DeletePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1260,7 +1260,7 @@ const enhancedClient = {
    * @throws {LinearError} With VALIDATION type if required fields are missing
    * @throws {LinearError} With various types for API errors
    */
-  async createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearDocument.IssueLabelPayload> {
+  async _createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearDocument.IssueLabelPayload> {
     try {
       // 1. Validate required parameters
       if (!input.name) {
@@ -1353,7 +1353,7 @@ const enhancedClient = {
    */
   async safeCreateIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearResult<LinearDocument.IssueLabelPayload>> {
     try {
-      const result = await this.createIssueLabel(input);
+      const result = await this._createIssueLabel(input);
       return createSuccessResult<LinearDocument.IssueLabelPayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1380,7 +1380,7 @@ const enhancedClient = {
    * @returns TeamConnection containing nodes and pagination info
    * @throws {LinearError} With various types for API errors
    */
-  async teams(
+  async _teams(
     filter?: LinearDocument.TeamFilter, 
     first: number = 50, 
     after?: string,
@@ -1484,7 +1484,7 @@ const enhancedClient = {
     includeArchived: boolean = false
   ): Promise<LinearResult<LinearDocument.TeamConnection>> {
     try {
-      const result = await this.teams(filter, first, after, includeArchived);
+      const result = await this._teams(filter, first, after, includeArchived);
       return createSuccessResult<LinearDocument.TeamConnection>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1509,7 +1509,7 @@ const enhancedClient = {
    * @throws {LinearError} With NOT_FOUND type if team doesn't exist
    * @throws {LinearError} With VALIDATION type if ID format is invalid
    */
-  async team(id: string): Promise<LinearDocument.Team> {
+  async _team(id: string): Promise<LinearDocument.Team> {
     try {
       // 1. Validate parameters
       validateLinearId(id, LinearEntityType.TEAM);
@@ -1597,7 +1597,7 @@ const enhancedClient = {
    */
   async safeTeam(id: string): Promise<LinearResult<LinearDocument.Team>> {
     try {
-      const team = await this.team(id);
+      const team = await this._team(id);
       return createSuccessResult<LinearDocument.Team>(team);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1621,7 +1621,7 @@ const enhancedClient = {
    * @throws {LinearError} With AUTHENTICATION type if the user is not authenticated
    * @throws {LinearError} With various types for API errors
    */
-  async getViewer(): Promise<LinearDocument.User> {
+  async _getViewer(): Promise<LinearDocument.User> {
     try {
       // Define GraphQL query with all required fields
       const query = `
@@ -1696,7 +1696,7 @@ const enhancedClient = {
    */
   async safeGetViewer(): Promise<LinearResult<LinearDocument.User>> {
     try {
-      const user = await this.getViewer();
+      const user = await this._getViewer();
       return createSuccessResult<LinearDocument.User>(user);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1720,7 +1720,7 @@ const enhancedClient = {
    * @returns The cycle data
    * @throws {LinearError} Standardized error for API or validation failures
    */
-  async cycle(id: string): Promise<LinearDocument.Cycle> {
+  async _cycle(id: string): Promise<LinearDocument.Cycle> {
     // Validate cycle ID
     if (!id || id.trim() === '') {
       throw new LinearError(
@@ -1796,7 +1796,7 @@ const enhancedClient = {
    */
   async safeCycle(id: string): Promise<LinearResult<LinearDocument.Cycle>> {
     try {
-      const cycle = await this.cycle(id);
+      const cycle = await this._cycle(id);
       return createSuccessResult<LinearDocument.Cycle>(cycle);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1818,7 +1818,7 @@ const enhancedClient = {
    * @returns Connection object with cycle nodes
    * @throws {LinearError} Standardized error for API or validation failures
    */
-  async cycles(
+  async _cycles(
     filter?: LinearDocument.CycleFilter, 
     first: number = 50, 
     after?: string,
@@ -1897,7 +1897,7 @@ const enhancedClient = {
     includeArchived: boolean = false
   ): Promise<LinearResult<LinearDocument.CycleConnection>> {
     try {
-      const cycles = await this.cycles(filter, first, after, includeArchived);
+      const cycles = await this._cycles(filter, first, after, includeArchived);
       return createSuccessResult<LinearDocument.CycleConnection>(cycles);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -1916,7 +1916,7 @@ const enhancedClient = {
    * @returns CyclePayload containing the created cycle
    * @throws {LinearError} Standardized error for API or validation failures
    */
-  async createCycle(input: LinearDocument.CycleCreateInput): Promise<LinearDocument.CyclePayload> {
+  async _createCycle(input: LinearDocument.CycleCreateInput): Promise<LinearDocument.CyclePayload> {
     // Validate required inputs
     if (!input.teamId) {
       throw new LinearError(
@@ -1993,7 +1993,7 @@ const enhancedClient = {
    */
   async safeCreateCycle(input: LinearDocument.CycleCreateInput): Promise<LinearResult<LinearDocument.CyclePayload>> {
     try {
-      const result = await this.createCycle(input);
+      const result = await this._createCycle(input);
       return createSuccessResult<LinearDocument.CyclePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -2013,7 +2013,7 @@ const enhancedClient = {
    * @returns CyclePayload containing the updated cycle
    * @throws {LinearError} Standardized error for API or validation failures
    */
-  async updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearDocument.CyclePayload> {
+  async _updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearDocument.CyclePayload> {
     // Validate cycle ID
     if (!id || id.trim() === '') {
       throw new LinearError(
@@ -2089,7 +2089,7 @@ const enhancedClient = {
    */
   async safeUpdateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearResult<LinearDocument.CyclePayload>> {
     try {
-      const result = await this.updateCycle(id, input);
+      const result = await this._updateCycle(id, input);
       return createSuccessResult<LinearDocument.CyclePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -2109,7 +2109,7 @@ const enhancedClient = {
    * @returns IssuePayload containing the updated issue
    * @throws {LinearError} Standardized error for API or validation failures
    */
-  async addIssueToCycle(issueId: string, cycleId: string): Promise<LinearDocument.IssuePayload> {
+  async _addIssueToCycle(issueId: string, cycleId: string): Promise<LinearDocument.IssuePayload> {
     // Validate IDs
     if (!issueId || issueId.trim() === '') {
       throw new LinearError(
@@ -2192,7 +2192,7 @@ const enhancedClient = {
    */
   async safeAddIssueToCycle(issueId: string, cycleId: string): Promise<LinearResult<LinearDocument.IssuePayload>> {
     try {
-      const result = await this.addIssueToCycle(issueId, cycleId);
+      const result = await this._addIssueToCycle(issueId, cycleId);
       return createSuccessResult<LinearDocument.IssuePayload>(result);
     } catch (error) {
       if (error instanceof LinearError) {
@@ -2230,7 +2230,96 @@ const enhancedClient = {
       
       return createErrorResult<Record<string, unknown>>(linearError);
     }
-  }
+  },
+
+  /**
+   * Fetch comments for a specific issue
+   * 
+   * @param issueId The ID of the issue to fetch comments for
+   * @returns Connection object with comment nodes
+   * @throws {LinearError} Standardized error for API or validation failures
+   */
+  async _getIssueComments(issueId: string): Promise<{ nodes: Array<LinearDocument.Comment> }> {
+    try {
+      // Validate parameters
+      validateLinearId(issueId, LinearEntityType.ISSUE);
+      
+      // Define GraphQL query with all required fields
+      const query = `
+        query GetIssueComments($issueId: String!) {
+          issue(id: $issueId) {
+            comments {
+              nodes {
+                id
+                body
+                createdAt
+                updatedAt
+                editedAt
+                user {
+                  id
+                  name
+                  email
+                }
+              }
+            }
+          }
+        }
+      `;
+      
+      // Execute query with variables
+      const variables = { issueId };
+      const result = await this.safeExecuteGraphQLQuery<{ issue: { comments: { nodes: Array<LinearDocument.Comment> } } }>(query, variables);
+      
+      // Validate response
+      if (!result.success || !result.data?.issue?.comments) {
+        throw new LinearError(
+          result.error?.message || `Failed to fetch comments for issue with ID ${issueId}`,
+          result.error?.type || LinearErrorType.UNKNOWN,
+          result.error?.originalError
+        );
+      }
+      
+      // Return just the comments object
+      return result.data.issue.comments;
+    } catch (error) {
+      // Handle errors
+      if (error instanceof LinearError) {
+        throw error;
+      }
+      
+      // Convert other errors to LinearError
+      throw new LinearError(
+        `Error fetching comments for issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        LinearErrorType.UNKNOWN,
+        error
+      );
+    }
+  },
+  
+  /**
+   * Fetch comments for a specific issue with error handling using the Result pattern
+   * 
+   * @param issueId The ID of the issue to fetch comments for
+   * @returns LinearResult containing either comments data or error information
+   */
+  async safeGetIssueComments(issueId: string): Promise<LinearResult<{ nodes: Array<LinearDocument.Comment> }>> {
+    try {
+      const comments = await this._getIssueComments(issueId);
+      return createSuccessResult<{ nodes: Array<LinearDocument.Comment> }>(comments);
+    } catch (error) {
+      if (error instanceof LinearError) {
+        return createErrorResult<{ nodes: Array<LinearDocument.Comment> }>(error);
+      }
+      
+      const linearError = new LinearError(
+        `Error in safeGetIssueComments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        LinearErrorType.UNKNOWN,
+        error
+      );
+      
+      return createErrorResult<{ nodes: Array<LinearDocument.Comment> }>(linearError);
+    }
+  },
 };
 
 // Export enhancedClient both as named and default export

@@ -119,11 +119,11 @@ export const LinearGetIssueTool = createSafeTool({
         };
       }
       
-      // Fetch the issue using the new enhanced client
-      const issue = await enhancedClient.issue(args.issueId);
+      // Fetch the issue using the enhanced client
+      const issueResult = await enhancedClient.safeGetIssue(args.issueId);
       
       // Return an error message if the issue doesn't exist
-      if (!issue) {
+      if (!issueResult.success || !issueResult.data) {
         return {
           content: [{
             type: "text",
@@ -132,50 +132,28 @@ export const LinearGetIssueTool = createSafeTool({
         };
       }
       
-      // For backward compatibility, we need to maintain the same behavior
-      // but work with the new structure. Here we'll use the issue data from the 
-      // enhanced client and get the comments using the old client for now.
+      const issue = issueResult.data;
       
       // Safely fetch comments with error handling
       let comments: Comment[] = [];
       try {
-        // Continue using legacy client for comments for now, as it has the method pattern
-        const legacyIssue = await enhancedClient.issue(args.issueId);
-        const commentsQuery = await legacyIssue.comments();
-        
-        // Process and transform comments to a consistent format
-        comments = await Promise.all(commentsQuery.nodes.map(async (comment) => {
-          try {
-            // Process user data if available
-            let userData = null;
-            if (comment.user) {
-              const user = await comment.user;
-              userData = {
-                id: user.id,
-                name: user.name,
-                email: user.email
-              };
-            }
-            
+        const commentsResult = await enhancedClient.safeGetIssueComments(args.issueId);
+        if (commentsResult.success && commentsResult.data) {
+          comments = commentsResult.data.nodes.map(comment => {
             return {
               id: comment.id || "unknown-id",
               body: comment.body || "",
               createdAt: comment.createdAt || new Date().toISOString(),
               updatedAt: comment.updatedAt || new Date().toISOString(),
-              user: userData
+              user: comment.user ? {
+                id: comment.user.id,
+                name: comment.user.name,
+                email: comment.user.email
+              } : null
             } as Comment;
-          } catch {
-            // Return fallback comment on parsing error
-            return {
-              id: "error-parsing",
-              body: "Error loading comment content",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              user: null
-            } as Comment;
-          }
-        }));
-      } catch {
+          });
+        }
+      } catch (error) {
         // Fail gracefully if comments can't be loaded
         comments = [{
           id: "comments-error",
@@ -186,109 +164,39 @@ export const LinearGetIssueTool = createSafeTool({
         } as Comment];
       }
 
-      // Get state using the legacy client for consistency
+      // Extract state information from the issue object
       let status: WorkflowState | null = null;
-      try {
-        // Continue using legacy client for state access
-        const legacyIssue = await enhancedClient.issue(args.issueId);
-        const stateData = await legacyIssue.state;
-        
-        if (stateData) {
-          status = {
-            id: stateData.id || "unknown-id",
-            name: stateData.name || "Unknown status",
-            color: stateData.color || "#cccccc",
-            type: stateData.type || "unknown",
-          } as WorkflowState;
-        }
-      } catch {
-        status = null;
+      if (issue.state) {
+        status = {
+          id: issue.state.id || "unknown-id",
+          name: issue.state.name || "Unknown status",
+          color: issue.state.color || "#cccccc",
+          type: issue.state.type || "unknown",
+        } as WorkflowState;
       }
       
-      // Access related issues through a different path or fetch them separately
-      // We might need to make a secondary GraphQL query for more data
-      const legacyIssue = await enhancedClient.issue(args.issueId);
-      const childIssuesQuery = await legacyIssue.children();
-      
-      // Fetch sub-issues with error handling
+      // Extract sub-issues from the issue object
       let subIssues: SubIssueData[] = [];
-      if (childIssuesQuery && childIssuesQuery.nodes) {
-        // Process each sub-issue
-        for (const childIssue of childIssuesQuery.nodes) {
-          try {
-            // Get status for each sub-issue
-            let subIssueStatus: WorkflowState | null = null;
-            try {
-              const childStateData = await childIssue.state;
-              if (childStateData) {
-                subIssueStatus = {
-                  id: childStateData.id || "unknown-id",
-                  name: childStateData.name || "Unknown status",
-                  color: childStateData.color || "#cccccc",
-                  type: childStateData.type || "unknown",
-                } as WorkflowState;
-              }
-            } catch {
-              subIssueStatus = null;
-            }
-            
-            // Add sub-issue to the array
-            subIssues.push({
-              id: childIssue.id || "unknown-id",
-              title: childIssue.title || "No title",
-              priority: typeof childIssue.priority === 'number' ? childIssue.priority : 0,
-              status: subIssueStatus
-            });
-          } catch {
-            // Skip sub-issues that can't be processed
-            continue;
-          }
-        }
-      } else {
-        // Fallback to using old client for sub-issues
-        const legacyIssue = await enhancedClient.issue(args.issueId);
-        const childIssuesQuery = await legacyIssue.children();
-        
-        if (childIssuesQuery && childIssuesQuery.nodes) {
-          // Process each sub-issue
-          for (const childIssue of childIssuesQuery.nodes) {
-            try {
-              // Get status for each sub-issue
-              let subIssueStatus: WorkflowState | null = null;
-              try {
-                const childStateData = await childIssue.state;
-                if (childStateData) {
-                  subIssueStatus = {
-                    id: childStateData.id || "unknown-id",
-                    name: childStateData.name || "Unknown status",
-                    color: childStateData.color || "#cccccc",
-                    type: childStateData.type || "unknown",
-                  } as WorkflowState;
-                }
-              } catch {
-                subIssueStatus = null;
-              }
-              
-              // Add sub-issue to the array
-              subIssues.push({
-                id: childIssue.id || "unknown-id",
-                title: childIssue.title || "No title",
-                priority: typeof childIssue.priority === 'number' ? childIssue.priority : 0,
-                status: subIssueStatus
-              });
-            } catch {
-              // Skip sub-issues that can't be processed
-              continue;
-            }
-          }
-        }
+      if (issue.children && issue.children.nodes) {
+        subIssues = issue.children.nodes.map(childIssue => {
+          const subIssueStatus = childIssue.state ? {
+            id: childIssue.state.id || "unknown-id",
+            name: childIssue.state.name || "Unknown status",
+            color: childIssue.state.color || "#cccccc",
+            type: childIssue.state.type || "unknown",
+          } as WorkflowState : null;
+          
+          return {
+            id: childIssue.id || "unknown-id",
+            title: childIssue.title || "No title",
+            priority: typeof childIssue.priority === 'number' ? childIssue.priority : 0,
+            status: subIssueStatus
+          };
+        });
       }
-      
-      // Use the issue directly as an Issue type
-      const issueData = issue as unknown as Issue;
       
       // Format issue data to human readable text
-      const formattedText = formatIssueToHumanReadable(issueData, comments, status, subIssues);
+      const formattedText = formatIssueToHumanReadable(issue as unknown as Issue, comments, status, subIssues);
       
       // Return the formatted text
       return {

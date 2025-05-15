@@ -104,7 +104,7 @@ export const LinearSearchIssuesTool = createSafeTool({
       // Fetch issues with pagination - we need to request more to handle skiping
       // Linear API has a first parameter but no skip/offset parameter
       const maxFetch = skip + limit;
-      const getAllIssues = await enhancedClient.issues(
+      const getAllIssues = await enhancedClient._issues(
         {}, // Empty filter object
         maxFetch // Pass maxFetch as the 'first' parameter
       );

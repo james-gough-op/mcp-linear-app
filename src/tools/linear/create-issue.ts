@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-    Issue,
-    IssuePayload
+  Issue,
+  IssuePayload
 } from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
@@ -268,7 +268,7 @@ export const LinearCreateIssueTool = createSafeTool({
       }
 
       // Create the issue using the enhanced client
-      const createIssueResponse = await enhancedClient.createIssue({
+      const createIssueResponse = await enhancedClient._createIssue({
         title: args.title,
         description: args.description,
         stateId: stateId,

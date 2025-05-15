@@ -90,7 +90,7 @@ export const LinearApplyLabelsTool = createSafeTool({
       }
       
       // First, get the issue to retrieve its current labels
-      const issue = await enhancedClient.issue(args.issueId);
+      const issue = await enhancedClient.safeGetIssue(args.issueId);
       
       if (!issue) {
         return {
@@ -140,7 +140,7 @@ export const LinearApplyLabelsTool = createSafeTool({
       const combinedLabelIds = [...new Set([...existingLabelIds, ...args.labelIds])];
       
       // Update the issue with the combined labels
-      const updateResponse = await enhancedClient.updateIssue(args.issueId, {
+      const updateResponse = await enhancedClient._updateIssue(args.issueId, {
         labelIds: combinedLabelIds,
       });
       
@@ -154,7 +154,7 @@ export const LinearApplyLabelsTool = createSafeTool({
       }
       
       // Get the updated issue with its labels
-      const updatedIssue = await enhancedClient.issue(args.issueId);
+      const updatedIssue = await enhancedClient.safeGetIssue(args.issueId);
       
       // Query for updated labels
       const updatedLabelsResult = await enhancedClient.safeExecuteGraphQLQuery<IssueLabelsResponse>(labelsQuery, { issueId: args.issueId });
@@ -166,8 +166,8 @@ export const LinearApplyLabelsTool = createSafeTool({
       
       // Convert the issue and labels to the expected types
       const issueData: Issue = {
-        id: updatedIssue.id,
-        title: updatedIssue.title,
+        id: updatedIssue.data?.id,
+        title: updatedIssue.data?.title,
         labels: {
           nodes: labels
         }

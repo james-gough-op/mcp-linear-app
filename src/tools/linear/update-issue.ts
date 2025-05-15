@@ -178,7 +178,7 @@ export const LinearUpdateIssueTool = createSafeTool({
       }
       
       // Update the issue
-      const updateIssueResponse = await enhancedClient.updateIssue(args.id, {
+      const updateIssueResponse = await enhancedClient._updateIssue(args.id, {
         title: args.title,
         description: args.description,
         trashed: args.trashed,

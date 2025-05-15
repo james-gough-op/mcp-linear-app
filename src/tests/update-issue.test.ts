@@ -50,7 +50,7 @@ describe('enhancedClient.updateIssue', () => {
     };
     
     // Act
-    const result = await enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
+    const result = await enhancedClient._updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
     
     // Assert
     expect(result).toEqual(mockPayload);
@@ -78,8 +78,8 @@ describe('enhancedClient.updateIssue', () => {
     vi.spyOn(enhancedClient, 'executeGraphQLMutation');
     
     // Mock just this test case directly
-    const originalUpdateIssue = enhancedClient.updateIssue;
-    enhancedClient.updateIssue = vi.fn().mockImplementation((id, input) => {
+    const originalUpdateIssue = enhancedClient._updateIssue;
+    enhancedClient._updateIssue = vi.fn().mockImplementation((id, input) => {
       if (Object.keys(input).length === 0) {
         throw emptyInputError;
       }
@@ -91,11 +91,11 @@ describe('enhancedClient.updateIssue', () => {
     
     // Act & Assert
     try {
-      await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(emptyInputError);
+      await expect(enhancedClient._updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(emptyInputError);
       expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
     } finally {
       // Restore the original method after the test
-      enhancedClient.updateIssue = originalUpdateIssue;
+      enhancedClient._updateIssue = originalUpdateIssue;
     }
   });
   
@@ -103,14 +103,16 @@ describe('enhancedClient.updateIssue', () => {
   it('should pass through LinearError from GraphQL execution', async () => {
     // Arrange - mock the implementation to handle API errors
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'updateIssue').mockRejectedValueOnce(apiError);
+    
+    // Mock the safeExecuteGraphQLMutation to reject with the API error
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockRejectedValueOnce(apiError);
     
     const input: IssueUpdateInput = {
       title: 'Updated Issue Title'
     };
     
     // Act & Assert
-    await expect(enhancedClient.updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(apiError);
+    await expect(enhancedClient._updateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput)).rejects.toThrow(apiError);
   });
 });
 
@@ -125,60 +127,87 @@ describe('enhancedClient.safeUpdateIssue', () => {
       lastSyncId: 123456
     };
     
-    // Spy on updateIssue which is used internally by safeUpdateIssue
-    // Use unknown as an intermediate step for safer type casting
-    vi.spyOn(enhancedClient, 'updateIssue').mockResolvedValueOnce(mockPayload as unknown as LinearDocument.IssuePayload);
+    // Store original method
+    const original_updateIssue = enhancedClient._updateIssue;
+    
+    // Mock _updateIssue which is used internally by safeUpdateIssue
+    enhancedClient._updateIssue = vi.fn().mockResolvedValueOnce(mockPayload as unknown as LinearDocument.IssuePayload);
     
     const input: IssueUpdateInput = {
       title: 'Updated Issue Title'
     };
     
-    // Act
-    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
-    
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient.updateIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE, input);
+    try {
+      // Act
+      const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockPayload);
+      expect(enhancedClient._updateIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE, input);
+    } finally {
+      // Restore original method
+      enhancedClient._updateIssue = original_updateIssue;
+    }
   });
   
   // Error case for validation error
   it('should return error result for invalid input', async () => {
     // Arrange
     const validationError = new LinearError('Invalid issue ID', LinearErrorType.VALIDATION);
-    vi.spyOn(enhancedClient, 'updateIssue').mockRejectedValueOnce(validationError);
+    
+    // Store original method
+    const original_updateIssue = enhancedClient._updateIssue;
+    
+    // Mock _updateIssue to throw the validation error
+    enhancedClient._updateIssue = vi.fn().mockRejectedValueOnce(validationError);
     
     const input: IssueUpdateInput = {
       title: 'Updated Issue Title'
     };
     
-    // Act
-    const result = await enhancedClient.safeUpdateIssue('invalid-id', input as LinearDocument.IssueUpdateInput);
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(validationError);
-    expect(result.data).toBeUndefined();
+    try {
+      // Act
+      const result = await enhancedClient.safeUpdateIssue('invalid-id', input as LinearDocument.IssueUpdateInput);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(validationError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._updateIssue = original_updateIssue;
+    }
   });
   
   // Unknown error conversion
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
     const unknownError = new Error('Some unexpected error');
-    vi.spyOn(enhancedClient, 'updateIssue').mockRejectedValueOnce(unknownError);
+    
+    // Store original method
+    const original_updateIssue = enhancedClient._updateIssue;
+    
+    // Mock _updateIssue to throw an unknown error
+    enhancedClient._updateIssue = vi.fn().mockRejectedValueOnce(unknownError);
     
     const input: IssueUpdateInput = {
       title: 'Updated Issue Title'
     };
     
-    // Act
-    const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toBeInstanceOf(LinearError);
-    expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-    expect(result.error?.message).toContain('Some unexpected error');
-    expect(result.data).toBeUndefined();
+    try {
+      // Act
+      const result = await enhancedClient.safeUpdateIssue(MOCK_IDS.ISSUE, input as LinearDocument.IssueUpdateInput);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeInstanceOf(LinearError);
+      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
+      expect(result.error?.message).toContain('Some unexpected error');
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._updateIssue = original_updateIssue;
+    }
   });
 }); 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MockLinearClient } from '../test/mocks/MockLinearClient.js';
-import { MockLinearResponses } from '../test/mocks/linearResponses.js';
+import { MockLinearClient } from '../tests/mocks/MockLinearClient.js';
+import { MockLinearResponses } from '../tests/mocks/linearResponses.js';
 
 // Mock UUIDs for testing - ensure they are valid UUID v4 format
 const MOCK_TEAM_ID = '123e4567-e89b-42d3-a456-556642440000';

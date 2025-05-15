@@ -54,7 +54,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       // Create the comment
-      const createCommentResponse = await enhancedClient.createComment({
+      const createCommentResponse = await enhancedClient._createComment({
         body: args.comment,
         issueId: args.issueId,
       });

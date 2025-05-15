@@ -93,7 +93,7 @@ export async function getStateId(stateName: string, teamId: string): Promise<str
   try {
     // Import enhancedClient for GraphQL implementation
     const { enhancedClient } = await import('./client.js');
-    const team = await enhancedClient.team(teamId);
+    const team = await enhancedClient._team(teamId);
     
     if (!team) {
       console.error(`Team with ID ${teamId} not found`);

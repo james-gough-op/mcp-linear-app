@@ -52,7 +52,7 @@ describe('enhancedClient.teams', () => {
     });
     
     // Act
-    const result = await enhancedClient.teams();
+    const result = await enhancedClient._teams();
     
     // Assert
     expect(result).toEqual(mockTeams);
@@ -76,7 +76,7 @@ describe('enhancedClient.teams', () => {
     });
     
     // Act
-    const result = await enhancedClient.teams(filter);
+    const result = await enhancedClient._teams(filter);
     
     // Assert
     expect(result).toEqual(mockTeams);
@@ -93,7 +93,7 @@ describe('enhancedClient.teams', () => {
     vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient.teams()).rejects.toThrow(apiError);
+    await expect(enhancedClient._teams()).rejects.toThrow(apiError);
   });
 });
 
@@ -103,30 +103,48 @@ describe('enhancedClient.safeTeams', () => {
     // Arrange
     const mockTeams = createMockTeamsConnection();
     
-    // Spy on teams which is used internally by safeTeams
-    vi.spyOn(enhancedClient, 'teams').mockResolvedValueOnce(mockTeams);
+    // Store original method
+    const originalMethod = enhancedClient._teams;
     
-    // Act
-    const result = await enhancedClient.safeTeams();
+    // Mock the _teams method which is used internally by safeTeams
+    enhancedClient._teams = vi.fn().mockResolvedValueOnce(mockTeams);
     
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockTeams);
-    expect(enhancedClient.teams).toHaveBeenCalled();
+    try {
+      // Act
+      const result = await enhancedClient.safeTeams();
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTeams);
+      expect(enhancedClient._teams).toHaveBeenCalled();
+    } finally {
+      // Restore original method
+      enhancedClient._teams = originalMethod;
+    }
   });
   
   // Error case
   it('should return error result when teams throws an error', async () => {
     // Arrange
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'teams').mockRejectedValueOnce(apiError);
     
-    // Act
-    const result = await enhancedClient.safeTeams();
+    // Store original method
+    const originalMethod = enhancedClient._teams;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
+    // Mock the _teams method to throw an error
+    enhancedClient._teams = vi.fn().mockRejectedValueOnce(apiError);
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeTeams();
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(apiError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._teams = originalMethod;
+    }
   });
 }); 

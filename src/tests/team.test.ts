@@ -53,7 +53,7 @@ describe('enhancedClient.team', () => {
     });
     
     // Act
-    const result = await enhancedClient.team(MOCK_IDS.TEAM);
+    const result = await enhancedClient._team(MOCK_IDS.TEAM);
     
     // Assert
     expect(result).toEqual(mockTeam);
@@ -70,8 +70,8 @@ describe('enhancedClient.team', () => {
     const invalidTeamId = 'invalid-id';
     
     // Act & Assert
-    await expect(enhancedClient.team(invalidTeamId)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.team(invalidTeamId)).rejects.toMatchObject({
+    await expect(enhancedClient._team(invalidTeamId)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._team(invalidTeamId)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.executeGraphQLQuery).not.toHaveBeenCalled();
@@ -79,26 +79,30 @@ describe('enhancedClient.team', () => {
   
   // Not found error
   it('should throw not found error when team does not exist', async () => {
-    // Arrange
-    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
-      data: { team: null }
-    });
+    // Store original method
+    const originalMethod = enhancedClient._team;
     
-    // Create a spy to bypass validation to test NOT_FOUND case
-    vi.spyOn(enhancedClient, 'team').mockImplementationOnce(async () => {
-      // Simulate the validateLinearId call passing but the GraphQL response returning null
-      const notFoundError = new LinearError(
-        `Team with ID ${MOCK_IDS.TEAM} not found`,
-        LinearErrorType.NOT_FOUND
-      );
-      throw notFoundError;
-    });
+    // Create the error that will be thrown
+    const notFoundErrorMessage = `Team with ID ${MOCK_IDS.TEAM} not found`;
+    const notFoundError = new LinearError(
+      notFoundErrorMessage,
+      LinearErrorType.NOT_FOUND
+    );
     
-    // Act & Assert
-    await expect(enhancedClient.team(MOCK_IDS.TEAM)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.team(MOCK_IDS.TEAM)).rejects.toMatchObject({
-      type: LinearErrorType.NOT_FOUND
-    });
+    // Mock the _team method to reject with the not found error
+    enhancedClient._team = vi.fn().mockRejectedValue(notFoundError);
+    
+    try {
+      // Act & Assert - only run the test once to avoid consuming the mock
+      const errorPromise = enhancedClient._team(MOCK_IDS.TEAM);
+      await expect(errorPromise).rejects.toThrow(notFoundErrorMessage);
+      await expect(errorPromise).rejects.toMatchObject({
+        type: LinearErrorType.NOT_FOUND
+      });
+    } finally {
+      // Restore original method
+      enhancedClient._team = originalMethod;
+    }
   });
   
   // Error from API
@@ -108,7 +112,7 @@ describe('enhancedClient.team', () => {
     vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient.team(MOCK_IDS.TEAM)).rejects.toThrow(apiError);
+    await expect(enhancedClient._team(MOCK_IDS.TEAM)).rejects.toThrow(apiError);
   });
 });
 
@@ -118,30 +122,48 @@ describe('enhancedClient.safeTeam', () => {
     // Arrange
     const mockTeam = createMockTeam();
     
-    // Spy on team which is used internally by safeTeam
-    vi.spyOn(enhancedClient, 'team').mockResolvedValueOnce(mockTeam as LinearDocument.Team);
+    // Store original method
+    const originalMethod = enhancedClient._team;
     
-    // Act
-    const result = await enhancedClient.safeTeam(MOCK_IDS.TEAM);
+    // Mock the _team method which is used internally by safeTeam
+    enhancedClient._team = vi.fn().mockResolvedValueOnce(mockTeam);
     
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockTeam);
-    expect(enhancedClient.team).toHaveBeenCalledWith(MOCK_IDS.TEAM);
+    try {
+      // Act
+      const result = await enhancedClient.safeTeam(MOCK_IDS.TEAM);
+      
+      // Assert
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockTeam);
+      expect(enhancedClient._team).toHaveBeenCalledWith(MOCK_IDS.TEAM);
+    } finally {
+      // Restore original method
+      enhancedClient._team = originalMethod;
+    }
   });
   
   // Error case
   it('should return error result when team throws an error', async () => {
     // Arrange
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'team').mockRejectedValueOnce(apiError);
     
-    // Act
-    const result = await enhancedClient.safeTeam(MOCK_IDS.TEAM);
+    // Store original method
+    const originalMethod = enhancedClient._team;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
+    // Mock the _team method to throw an error
+    enhancedClient._team = vi.fn().mockRejectedValueOnce(apiError);
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeTeam(MOCK_IDS.TEAM);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(apiError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._team = originalMethod;
+    }
   });
 }); 

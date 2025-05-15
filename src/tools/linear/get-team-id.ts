@@ -35,7 +35,7 @@ export const LinearGetTeamIdTool = createSafeTool({
   handler: async () => {
     try {
       // Get teams from Linear
-      const teamsResponse = await enhancedClient.teams();
+      const teamsResponse = await enhancedClient._teams();
       
       if (!teamsResponse || !teamsResponse.nodes) {
         return {

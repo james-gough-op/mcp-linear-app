@@ -53,7 +53,7 @@ describe('enhancedClient.createIssueLabel', () => {
     });
     
     // Act
-    const result = await enhancedClient.createIssueLabel(input);
+    const result = await enhancedClient._createIssueLabel(input);
     
     // Assert
     expect(result).toEqual(mockPayload);
@@ -73,8 +73,8 @@ describe('enhancedClient.createIssueLabel', () => {
     } as IssueLabelCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient.createIssueLabel(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createIssueLabel(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createIssueLabel(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -89,8 +89,8 @@ describe('enhancedClient.createIssueLabel', () => {
     } as IssueLabelCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient.createIssueLabel(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createIssueLabel(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createIssueLabel(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('enhancedClient.createIssueLabel', () => {
     (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient.createIssueLabel(input)).rejects.toThrow(apiError);
+    await expect(enhancedClient._createIssueLabel(input)).rejects.toThrow(apiError);
   });
 });
 
@@ -125,7 +125,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     };
     
     // Spy on createIssueLabel which is used internally by safeCreateIssueLabel
-    vi.spyOn(enhancedClient, 'createIssueLabel').mockResolvedValueOnce(mockPayload);
+    vi.spyOn(enhancedClient, 'safeCreateIssueLabel').mockResolvedValueOnce(mockPayload);
     
     // Act
     const result = await enhancedClient.safeCreateIssueLabel(input);
@@ -133,7 +133,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient.createIssueLabel).toHaveBeenCalledWith(input);
+    expect(enhancedClient._createIssueLabel).toHaveBeenCalledWith(input);
   });
   
   // Error case - LinearError
@@ -146,7 +146,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     };
     
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'createIssueLabel').mockRejectedValueOnce(apiError);
+    vi.spyOn(enhancedClient, 'safeCreateIssueLabel').mockRejectedValueOnce(apiError);
     
     // Act
     const result = await enhancedClient.safeCreateIssueLabel(input);

@@ -62,7 +62,7 @@ export const LinearGetCommentTool = createSafeTool({
       }
       
       // Fetch the issue to verify it exists
-      const issue = await enhancedClient.issue(args.issueId);
+      const issue = await enhancedClient.safeGetIssue(args.issueId);
       
       if (!issue) {
         return {

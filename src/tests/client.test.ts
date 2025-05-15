@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import enhancedClient from '../libs/client.js';
+import { LinearResult } from '../libs/errors.js';
 
 /**
  * Tests for the enhanced Linear client

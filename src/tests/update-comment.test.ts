@@ -53,23 +53,23 @@ describe('enhancedClient.updateComment', () => {
     };
     
     // To avoid the internal Linear API calls, mock the updateComment method directly
-    const originalUpdateComment = enhancedClient.updateComment;
-    enhancedClient.updateComment = vi.fn().mockResolvedValueOnce(mockPayload);
+    const originalUpdateComment = enhancedClient._updateComment;
+    enhancedClient._updateComment = vi.fn().mockResolvedValueOnce(mockPayload);
     
     try {
       // Act
-      const result = await enhancedClient.updateComment(commentId, input);
+      const result = await enhancedClient._updateComment(commentId, input);
       
       // Assert
       expect(result).toEqual(mockPayload);
       
       // We can't verify the call args for safeExecuteGraphQLMutation because we've bypassed it
       // but we can verify updateComment was called
-      expect(enhancedClient.updateComment).toHaveBeenCalledTimes(1);
-      expect(enhancedClient.updateComment).toHaveBeenCalledWith(commentId, input);
+      expect(enhancedClient._updateComment).toHaveBeenCalledTimes(1);
+      expect(enhancedClient._updateComment).toHaveBeenCalledWith(commentId, input);
     } finally {
       // Restore original method
-      enhancedClient.updateComment = originalUpdateComment;
+      enhancedClient._updateComment = originalUpdateComment;
     }
   });
   
@@ -82,8 +82,8 @@ describe('enhancedClient.updateComment', () => {
     };
     
     // Act & Assert
-    await expect(enhancedClient.updateComment(invalidCommentId, input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.updateComment(invalidCommentId, input)).rejects.toMatchObject({
+    await expect(enhancedClient._updateComment(invalidCommentId, input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._updateComment(invalidCommentId, input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
   });
@@ -95,8 +95,8 @@ describe('enhancedClient.updateComment', () => {
     const input: CommentUpdateInput = {};
     
     // Act & Assert
-    await expect(enhancedClient.updateComment(commentId, input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.updateComment(commentId, input)).rejects.toMatchObject({
+    await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._updateComment(commentId, input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
   });
@@ -115,16 +115,14 @@ describe('enhancedClient.updateComment', () => {
     // Mock implementation to return a failed result
     const notFoundError = new LinearError(expectedError, LinearErrorType.NOT_FOUND);
     
-    // Create a temporary implementation that returns a rejected promise
+    // Store the original method and replace it
     const originalMethod = enhancedClient.safeExecuteGraphQLMutation;
-    enhancedClient.safeExecuteGraphQLMutation = vi.fn().mockImplementation(() => {
-      return Promise.reject(notFoundError);
-    });
+    enhancedClient.safeExecuteGraphQLMutation = vi.fn().mockRejectedValueOnce(notFoundError);
     
     try {
       // Act & Assert
-      await expect(enhancedClient.updateComment(commentId, input)).rejects.toThrow(LinearError);
-      await expect(enhancedClient.updateComment(commentId, input)).rejects.toThrow(expectedError);
+      await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(LinearError);
+      await expect(enhancedClient._updateComment(commentId, input)).rejects.toThrow(expectedError);
     } finally {
       // Restore original method
       enhancedClient.safeExecuteGraphQLMutation = originalMethod;
@@ -139,13 +137,23 @@ describe('enhancedClient.updateComment', () => {
       body: 'Updated comment'
     };
     
-    // Mock implementation to bypass validation but fail with the expected error
-    vi.spyOn(enhancedClient as any, 'updateComment').mockImplementationOnce(async () => {
-      throw new LinearError('Failed to update comment', LinearErrorType.UNKNOWN);
+    // Store original method
+    const originalMethod = enhancedClient.safeExecuteGraphQLMutation;
+    
+    // Mock safeExecuteGraphQLMutation to return a successful response but with missing data
+    enhancedClient.safeExecuteGraphQLMutation = vi.fn().mockResolvedValueOnce({
+      success: true,
+      data: { commentUpdate: null } // Missing comment data
     });
     
-    // Act & Assert
-    await expect(enhancedClient.updateComment(commentId, input)).rejects.toThrow('Failed to update comment');
+    try {
+      // Act & Assert - use rejects for async functions
+      await expect(enhancedClient._updateComment(commentId, input))
+        .rejects.toThrow(LinearError);
+    } finally {
+      // Restore original method
+      enhancedClient.safeExecuteGraphQLMutation = originalMethod;
+    }
   });
 });
 
@@ -160,8 +168,8 @@ describe('enhancedClient.safeUpdateComment', () => {
     };
     
     // Temporarily replace method with a mock function
-    const originalMethod = enhancedClient.updateComment;
-    enhancedClient.updateComment = vi.fn().mockResolvedValue(mockPayload);
+    const originalMethod = enhancedClient._updateComment;
+    enhancedClient._updateComment = vi.fn().mockResolvedValue(mockPayload);
     
     try {
       // Act
@@ -170,10 +178,10 @@ describe('enhancedClient.safeUpdateComment', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockPayload);
-      expect(enhancedClient.updateComment).toHaveBeenCalledWith(commentId, input);
+      expect(enhancedClient._updateComment).toHaveBeenCalledWith(commentId, input);
     } finally {
       // Restore original method
-      enhancedClient.updateComment = originalMethod;
+      enhancedClient._updateComment = originalMethod;
     }
   });
   
@@ -186,15 +194,25 @@ describe('enhancedClient.safeUpdateComment', () => {
     };
     
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'updateComment').mockRejectedValueOnce(apiError);
     
-    // Act
-    const result = await enhancedClient.safeUpdateComment(commentId, input);
+    // Store original method
+    const originalMethod = enhancedClient._updateComment;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
+    // Mock the _updateComment method to throw the API error
+    enhancedClient._updateComment = vi.fn().mockRejectedValueOnce(apiError);
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeUpdateComment(commentId, input);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toEqual(apiError);
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._updateComment = originalMethod;
+    }
   });
   
   // Unknown error case
@@ -206,16 +224,26 @@ describe('enhancedClient.safeUpdateComment', () => {
     };
     
     const unknownError = new Error('Some unexpected error');
-    vi.spyOn(enhancedClient, 'updateComment').mockRejectedValueOnce(unknownError);
     
-    // Act
-    const result = await enhancedClient.safeUpdateComment(commentId, input);
+    // Store original method
+    const originalMethod = enhancedClient._updateComment;
     
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toBeInstanceOf(LinearError);
-    expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-    expect(result.error?.message).toContain('Some unexpected error');
-    expect(result.data).toBeUndefined();
+    // Mock _updateComment to throw the unknown error
+    enhancedClient._updateComment = vi.fn().mockRejectedValueOnce(unknownError);
+    
+    try {
+      // Act
+      const result = await enhancedClient.safeUpdateComment(commentId, input);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBeInstanceOf(LinearError);
+      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
+      expect(result.error?.message).toContain('Some unexpected error');
+      expect(result.data).toBeUndefined();
+    } finally {
+      // Restore original method
+      enhancedClient._updateComment = originalMethod;
+    }
   });
 }); 

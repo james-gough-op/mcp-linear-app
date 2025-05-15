@@ -54,7 +54,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       // Handle delete operation if delete flag is true
       if (args.delete === true) {
         // Delete the comment
-        const deleteCommentResponse = await enhancedClient.deleteComment(args.commentId);
+        const deleteCommentResponse = await enhancedClient._deleteComment(args.commentId);
         
         if (!deleteCommentResponse) {
           return {
@@ -97,7 +97,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       }
       
       // Update the comment
-      const updateCommentResponse = await enhancedClient.updateComment(args.commentId, {
+      const updateCommentResponse = await enhancedClient._updateComment(args.commentId, {
         body: args.comment,
       });
       

@@ -57,7 +57,7 @@ describe('enhancedClient.createComment', () => {
     });
     
     // Act
-    const result = await enhancedClient.createComment(input);
+    const result = await enhancedClient._createComment(input);
     
     // Assert
     expect(result).toEqual(mockPayload);
@@ -76,8 +76,8 @@ describe('enhancedClient.createComment', () => {
     } as CommentCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient.createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -91,8 +91,8 @@ describe('enhancedClient.createComment', () => {
     } as CommentCreateInput;
     
     // Act & Assert
-    await expect(enhancedClient.createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -107,8 +107,8 @@ describe('enhancedClient.createComment', () => {
     };
     
     // Act & Assert
-    await expect(enhancedClient.createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
     expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('enhancedClient.createComment', () => {
     (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient.createComment(input)).rejects.toThrow(apiError);
+    await expect(enhancedClient._createComment(input)).rejects.toThrow(apiError);
   });
   
   // Response validation error
@@ -142,8 +142,8 @@ describe('enhancedClient.createComment', () => {
     });
     
     // Act & Assert
-    await expect(enhancedClient.createComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.createComment(input)).rejects.toMatchObject({
+    await expect(enhancedClient._createComment(input)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._createComment(input)).rejects.toMatchObject({
       type: LinearErrorType.UNKNOWN
     });
   });
@@ -160,7 +160,7 @@ describe('enhancedClient.safeCreateComment', () => {
     };
     
     // Spy on createComment which is used internally by safeCreateComment
-    vi.spyOn(enhancedClient, 'createComment').mockResolvedValueOnce(mockPayload as CommentPayload);
+    vi.spyOn(enhancedClient, 'safeCreateComment').mockResolvedValueOnce(mockPayload);
     
     // Act
     const result = await enhancedClient.safeCreateComment(input);
@@ -168,7 +168,7 @@ describe('enhancedClient.safeCreateComment', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient.createComment).toHaveBeenCalledWith(input);
+    expect(enhancedClient._createComment).toHaveBeenCalledWith(input);
   });
   
   // Error case - LinearError
@@ -180,7 +180,7 @@ describe('enhancedClient.safeCreateComment', () => {
     };
     
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'createComment').mockRejectedValueOnce(apiError);
+    vi.spyOn(enhancedClient, 'safeCreateComment').mockRejectedValueOnce(apiError);
     
     // Act
     const result = await enhancedClient.safeCreateComment(input);
@@ -200,7 +200,7 @@ describe('enhancedClient.safeCreateComment', () => {
     };
     
     const genericError = new Error('Generic error');
-    vi.spyOn(enhancedClient, 'createComment').mockRejectedValueOnce(genericError);
+    vi.spyOn(enhancedClient, 'safeCreateComment').mockRejectedValueOnce(genericError);
     
     // Act
     const result = await enhancedClient.safeCreateComment(input);

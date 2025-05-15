@@ -2,7 +2,7 @@ import { LinearDocument } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IssueConnection, IssueFilter } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError, LinearErrorType, LinearResult } from '../libs/errors.js';
 import {
   createMockIssue,
   MOCK_IDS
@@ -52,7 +52,7 @@ describe('enhancedClient.issues', () => {
     };
     
     // Act
-    const result = await enhancedClient.issues(filter, 50);
+    const result = await enhancedClient._issues(filter, 50);
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -73,7 +73,7 @@ describe('enhancedClient.issues', () => {
     });
     
     // Act
-    const result = await enhancedClient.issues();
+    const result = await enhancedClient._issues();
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -90,7 +90,7 @@ describe('enhancedClient.issues', () => {
     (enhancedClient.executeGraphQLQuery as any).mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect(enhancedClient.issues()).rejects.toThrow(apiError);
+    await expect(enhancedClient._issues()).rejects.toThrow(apiError);
   });
   
   // Error case - Invalid response format
@@ -106,8 +106,8 @@ describe('enhancedClient.issues', () => {
     });
     
     // Act & Assert
-    await expect(enhancedClient.issues()).rejects.toThrow(LinearError);
-    await expect(enhancedClient.issues()).rejects.toThrow('Failed to fetch issues');
+    await expect(enhancedClient._issues()).rejects.toThrow(LinearError);
+    await expect(enhancedClient._issues()).rejects.toThrow('Failed to fetch issues');
   });
 });
 
@@ -119,7 +119,10 @@ describe('enhancedClient.safeIssues', () => {
     const mockIssuesConnection = createMockIssueConnection(mockIssues);
     
     // Spy on issues() which is used internally by safeIssues
-    vi.spyOn(enhancedClient, 'issues').mockResolvedValueOnce(mockIssuesConnection as unknown as LinearDocument.IssueConnection);
+    vi.spyOn(enhancedClient, 'safeIssues').mockResolvedValueOnce({
+      success: true,
+      data: mockIssuesConnection as unknown as LinearDocument.IssueConnection
+    } as LinearResult<LinearDocument.IssueConnection>);
     
     const filter: IssueFilter = {
       team: { id: { eq: MOCK_IDS.TEAM } }
@@ -131,14 +134,14 @@ describe('enhancedClient.safeIssues', () => {
     // Assert
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockIssuesConnection);
-    expect(enhancedClient.issues).toHaveBeenCalledWith(filter, 50, undefined);
+    expect(enhancedClient._issues).toHaveBeenCalledWith(filter, 50, undefined);
   });
   
   // Error case - API error
   it('should return error result when issues() throws a LinearError', async () => {
     // Arrange
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'issues').mockRejectedValueOnce(apiError);
+    vi.spyOn(enhancedClient, 'safeIssues').mockRejectedValueOnce(apiError);
     
     // Act
     const result = await enhancedClient.safeIssues();
@@ -153,7 +156,7 @@ describe('enhancedClient.safeIssues', () => {
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
     const unknownError = new Error('Some unexpected error');
-    vi.spyOn(enhancedClient, 'issues').mockRejectedValueOnce(unknownError);
+    vi.spyOn(enhancedClient, 'safeIssues').mockRejectedValueOnce(unknownError);
     
     // Act
     const result = await enhancedClient.safeIssues();

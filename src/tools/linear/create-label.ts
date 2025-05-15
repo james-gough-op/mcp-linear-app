@@ -87,7 +87,7 @@ export const LinearCreateLabelTool = createSafeTool({
       const color = args.color || "#000000"; // Default to black
       
       // Create the label using Linear SDK
-      const createLabelResponse = await enhancedClient.createIssueLabel({
+      const createLabelResponse = await enhancedClient._createIssueLabel({
         name: args.name,
         color: color,
         teamId: args.teamId

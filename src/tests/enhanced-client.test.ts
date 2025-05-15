@@ -31,7 +31,7 @@ describe('enhancedClient.createIssue', () => {
     };
     
     // Store original methods
-    const originalCreateIssue = enhancedClient.createIssue;
+    const originalCreateIssue = enhancedClient._createIssue;
     const originalSafeExecute = enhancedClient.safeExecuteGraphQLMutation;
     
     // Create our own mock functions that avoid type issues
@@ -48,7 +48,7 @@ describe('enhancedClient.createIssue', () => {
     
     // Temporarily replace the methods without TypeScript knowing
     enhancedClient.safeExecuteGraphQLMutation = mockSafeExecute;
-    enhancedClient.createIssue = mockCreateIssueFn;
+    enhancedClient._createIssue = mockCreateIssueFn;
     
     const input = {
       teamId: MOCK_IDS.TEAM,
@@ -70,7 +70,7 @@ describe('enhancedClient.createIssue', () => {
       );
     } finally {
       // Restore original methods
-      enhancedClient.createIssue = originalCreateIssue;
+      enhancedClient._createIssue = originalCreateIssue;
       enhancedClient.safeExecuteGraphQLMutation = originalSafeExecute;
     }
   });
@@ -78,7 +78,7 @@ describe('enhancedClient.createIssue', () => {
   // Validation errors
   it('should throw validation error for missing teamId', async () => {
     // Arrange
-    const originalCreateIssue = enhancedClient.createIssue;
+    const originalCreateIssue = enhancedClient._createIssue;
     
     // Create our mock that will return a rejected promise - important for async tests
     const mockCreateIssueFn = vi.fn().mockRejectedValue(
@@ -86,7 +86,7 @@ describe('enhancedClient.createIssue', () => {
     );
     
     // Replace the method
-    enhancedClient.createIssue = mockCreateIssueFn;
+    enhancedClient._createIssue = mockCreateIssueFn;
     
     const input = {
       title: 'Test Issue'
@@ -100,13 +100,13 @@ describe('enhancedClient.createIssue', () => {
       });
     } finally {
       // Restore original method
-      enhancedClient.createIssue = originalCreateIssue;
+      enhancedClient._createIssue = originalCreateIssue;
     }
   });
   
   it('should throw validation error for missing title', async () => {
     // Arrange
-    const originalCreateIssue = enhancedClient.createIssue;
+    const originalCreateIssue = enhancedClient._createIssue;
     
     // Create our mock that will return a rejected promise
     const mockCreateIssueFn = vi.fn().mockRejectedValue(
@@ -114,7 +114,7 @@ describe('enhancedClient.createIssue', () => {
     );
     
     // Replace the method
-    enhancedClient.createIssue = mockCreateIssueFn;
+    enhancedClient._createIssue = mockCreateIssueFn;
     
     const input = {
       teamId: MOCK_IDS.TEAM
@@ -128,7 +128,7 @@ describe('enhancedClient.createIssue', () => {
       });
     } finally {
       // Restore original method
-      enhancedClient.createIssue = originalCreateIssue;
+      enhancedClient._createIssue = originalCreateIssue;
     }
   });
   
@@ -138,13 +138,13 @@ describe('enhancedClient.createIssue', () => {
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
     
     // Store original methods
-    const originalCreateIssue = enhancedClient.createIssue;
+    const originalCreateIssue = enhancedClient._createIssue;
     
     // Create our mock function
     const mockCreateIssueFn = vi.fn().mockRejectedValue(apiError);
     
     // Replace the method
-    enhancedClient.createIssue = mockCreateIssueFn;
+    enhancedClient._createIssue = mockCreateIssueFn;
     
     const input = {
       teamId: MOCK_IDS.TEAM,
@@ -156,7 +156,7 @@ describe('enhancedClient.createIssue', () => {
       await expect(mockCreateIssueFn(input)).rejects.toThrow(apiError);
     } finally {
       // Restore original method
-      enhancedClient.createIssue = originalCreateIssue;
+      enhancedClient._createIssue = originalCreateIssue;
     }
   });
 }); 

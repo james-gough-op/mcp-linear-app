@@ -44,7 +44,7 @@ describe('enhancedClient.deleteComment', () => {
     
     try {
       // Act
-      const result = await enhancedClient.deleteComment(commentId);
+      const result = await enhancedClient._deleteComment(commentId);
       
       // Assert
       expect(result).toEqual(mockResponse);
@@ -65,8 +65,8 @@ describe('enhancedClient.deleteComment', () => {
     const invalidCommentId = 'invalid-id';
     
     // Act & Assert
-    await expect(enhancedClient.deleteComment(invalidCommentId)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.deleteComment(invalidCommentId)).rejects.toMatchObject({
+    await expect(enhancedClient._deleteComment(invalidCommentId)).rejects.toThrow(LinearError);
+    await expect(enhancedClient._deleteComment(invalidCommentId)).rejects.toMatchObject({
       type: LinearErrorType.VALIDATION
     });
   });
@@ -87,8 +87,8 @@ describe('enhancedClient.deleteComment', () => {
     
     try {
       // Act & Assert
-      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(LinearError);
-      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow(/Entity not found: Comment/);
+      await expect(enhancedClient._deleteComment(commentId)).rejects.toThrow(LinearError);
+      await expect(enhancedClient._deleteComment(commentId)).rejects.toThrow(/Entity not found: Comment/);
     } finally {
       // Restore original method
       enhancedClient.executeGraphQLMutation = originalMethod;
@@ -101,20 +101,20 @@ describe('enhancedClient.deleteComment', () => {
     const commentId = MOCK_IDS.COMMENT;
     
     // Store original method
-    const originalMethod = enhancedClient.deleteComment;
+    const originalMethod = enhancedClient._deleteComment;
     
     // Create mock implementation
     const mockDeleteComment = vi.fn().mockRejectedValue(
       new LinearError('Failed to delete comment', LinearErrorType.UNKNOWN)
     );
-    enhancedClient.deleteComment = mockDeleteComment;
+    enhancedClient._deleteComment = mockDeleteComment;
     
     try {
       // Act & Assert
-      await expect(enhancedClient.deleteComment(commentId)).rejects.toThrow('Failed to delete comment');
+      await expect(enhancedClient._deleteComment(commentId)).rejects.toThrow('Failed to delete comment');
     } finally {
       // Restore original method
-      enhancedClient.deleteComment = originalMethod;
+      enhancedClient._deleteComment = originalMethod;
     }
   });
 });
@@ -127,11 +127,11 @@ describe('enhancedClient.safeDeleteComment', () => {
     const mockResponse = createMockSuccessResponse();
     
     // Store original method
-    const originalMethod = enhancedClient.deleteComment;
+    const originalMethod = enhancedClient._deleteComment;
     
     // Create mock function
     const mockDeleteComment = vi.fn().mockResolvedValue(mockResponse);
-    enhancedClient.deleteComment = mockDeleteComment;
+    enhancedClient._deleteComment = mockDeleteComment;
     
     try {
       // Act
@@ -143,7 +143,7 @@ describe('enhancedClient.safeDeleteComment', () => {
       expect(mockDeleteComment).toHaveBeenCalledWith(commentId);
     } finally {
       // Restore original method
-      enhancedClient.deleteComment = originalMethod;
+      enhancedClient._deleteComment = originalMethod;
     }
   });
   
@@ -154,11 +154,11 @@ describe('enhancedClient.safeDeleteComment', () => {
     const apiError = new LinearError('API error', LinearErrorType.NETWORK);
     
     // Store original method
-    const originalMethod = enhancedClient.deleteComment;
+    const originalMethod = enhancedClient._deleteComment;
     
     // Create mock function
     const mockDeleteComment = vi.fn().mockRejectedValue(apiError);
-    enhancedClient.deleteComment = mockDeleteComment;
+    enhancedClient._deleteComment = mockDeleteComment;
     
     try {
       // Act
@@ -170,7 +170,7 @@ describe('enhancedClient.safeDeleteComment', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient.deleteComment = originalMethod;
+      enhancedClient._deleteComment = originalMethod;
     }
   });
   
@@ -181,11 +181,11 @@ describe('enhancedClient.safeDeleteComment', () => {
     const unknownError = new Error('Some unexpected error');
     
     // Store original method
-    const originalMethod = enhancedClient.deleteComment;
+    const originalMethod = enhancedClient._deleteComment;
     
     // Create mock function
     const mockDeleteComment = vi.fn().mockRejectedValue(unknownError);
-    enhancedClient.deleteComment = mockDeleteComment;
+    enhancedClient._deleteComment = mockDeleteComment;
     
     try {
       // Act
@@ -199,7 +199,7 @@ describe('enhancedClient.safeDeleteComment', () => {
       expect(result.data).toBeUndefined();
     } finally {
       // Restore original method
-      enhancedClient.deleteComment = originalMethod;
+      enhancedClient._deleteComment = originalMethod;
     }
   });
 }); 
