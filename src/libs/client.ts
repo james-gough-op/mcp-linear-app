@@ -1,5 +1,14 @@
 import { LinearClient } from '@linear/sdk';
 import dotenv from 'dotenv';
+import type {
+  Cycle as LinearCycle,
+  Issue as LinearIssue,
+  IssueLabel as LinearLabel,
+  Project as LinearProject,
+  Team as LinearTeam,
+  User as LinearUser,
+  WorkflowState as LinearWorkflowState
+} from '../generated/linear-types.js';
 import {
   LinearError,
   LinearErrorType,
@@ -8,6 +17,7 @@ import {
   createSuccessResult,
   logLinearError
 } from './errors.js';
+import { LinearEntityType, validateLinearId } from './id-management.js';
 
 // Load environment variables
 dotenv.config();
@@ -61,6 +71,72 @@ interface LinearRawResponse<T> {
   data?: T;
   extensions?: unknown;
 }
+
+/**
+ * Adapted User type for client use
+ * Takes the most essential properties from LinearUser
+ */
+export type User = Pick<LinearUser, 'id' | 'name' | 'displayName' | 'email'>;
+
+/**
+ * Adapted Team type for client use
+ */
+export type Team = Pick<LinearTeam, 'id' | 'name' | 'key'>;
+
+/**
+ * Adapted WorkflowState type for client use
+ */
+export type WorkflowState = Pick<LinearWorkflowState, 'id' | 'name' | 'color' | 'type'>;
+
+/**
+ * Adapted Label type for client use
+ */
+export type Label = Pick<LinearLabel, 'id' | 'name' | 'color'>;
+
+/**
+ * Adapted Project type for client use
+ */
+export type Project = Pick<LinearProject, 'id' | 'name'>;
+
+/**
+ * Adapted Cycle type for client use
+ */
+export type Cycle = Pick<LinearCycle, 'id' | 'name' | 'number'>;
+
+/**
+ * Interface for a complete Linear Issue
+ * Based on the generated LinearIssue type but with simplified structure
+ */
+export type Issue = Pick<
+  LinearIssue,
+  | 'id'
+  | 'title'
+  | 'description'
+  | 'number'
+  | 'priority'
+  | 'priorityLabel'
+  | 'estimate'
+  | 'branchName'
+  | 'dueDate'
+  | 'snoozedUntilAt'
+  | 'completedAt'
+  | 'canceledAt'
+  | 'autoClosedAt'
+  | 'archivedAt'
+  | 'startedAt'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'boardOrder'
+  | 'sortOrder'
+  | 'subIssueSortOrder'
+  | 'team'
+  | 'cycle'
+  | 'project'
+  | 'projectMilestone'
+  | 'parent'
+  | 'subscribers'
+>;
+
 
 /**
  * Enhanced Linear client with additional GraphQL functionality
@@ -229,6 +305,177 @@ export const enhancedClient = {
       );
       
       return createErrorResult<Record<string, unknown>>(linearError);
+    }
+  },
+  
+  /**
+   * Get an issue by ID
+   * 
+   * @param id The issue ID to retrieve
+   * @returns The issue object with all its properties
+   * @throws {LinearError} With NOT_FOUND type if issue doesn't exist
+   * @throws {LinearError} With VALIDATION type if ID format is invalid
+   */
+  async issue(id: string): Promise<Issue> {
+    try {
+      // 1. Validate parameters
+      validateLinearId(id, LinearEntityType.ISSUE);
+      
+      // 2. Define GraphQL query with all required fields
+      const query = `
+        query GetIssue($issueId: String!) {
+          issue(id: $issueId) {
+            id
+            title
+            description
+            number
+            priority
+            estimate
+            branchName
+            dueDate
+            snoozedUntilAt
+            completedAt
+            canceledAt
+            autoClosedAt
+            archivedAt
+            startedAt
+            subIssueSortOrder
+            createdAt
+            updatedAt
+            url
+            boardOrder
+            customerTicketCount
+            stateOrder
+            sortOrder
+            previousIdentifiers
+            teamId
+            cycleId
+            projectId
+            projectMilestoneId
+            parentId
+            priorityLabel
+            subscribers
+            
+            # Relationship fields
+            labels {
+              nodes {
+                id
+                name
+                color
+              }
+            }
+            team {
+              id
+              name
+              key
+            }
+            state {
+              id
+              name
+              color
+              type
+            }
+            parent {
+              id
+              title
+            }
+            project {
+              id
+              name
+            }
+            cycle {
+              id
+              name
+              number
+            }
+            children {
+              nodes {
+                id
+                title
+              }
+            }
+            assignee {
+              id
+              name
+              displayName
+              email
+            }
+            creator {
+              id
+              name
+            }
+          }
+        }
+      `;
+      
+      // 3. Execute query with variables
+      const variables = { issueId: id };
+      const response = await this.executeGraphQLQuery<{ issue: Issue }>(query, variables);
+      
+      // 4. Validate response
+      if (!response.data || !response.data.issue) {
+        throw new LinearError(
+          `Issue with ID ${id} not found`,
+          LinearErrorType.NOT_FOUND
+        );
+      }
+      
+      // 5. Return typed data
+      return response.data.issue;
+    } catch (error) {
+      // 6. Handle errors
+      if (error instanceof LinearError) {
+        throw error;
+      }
+      
+      // 7. Convert other errors to LinearError
+      throw new LinearError(
+        `Error fetching issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        LinearErrorType.UNKNOWN,
+        error
+      );
+    }
+  },
+  
+  /**
+   * Get an issue by ID with error handling using the Result pattern
+   * 
+   * This method is a non-throwing variant of the `issue()` method. Instead of throwing
+   * exceptions, it returns a Result object that contains either the successfully retrieved
+   * issue or error information.
+   *
+   * @param id The issue ID to retrieve
+   * @returns LinearResult containing either:
+   *          - success: true with issue data for valid requests
+   *          - success: false with error information for invalid inputs or not found issues
+   * @example
+   * ```typescript
+   * const result = await enhancedClient.safeIssue("ISS-123");
+   * if (result.success) {
+   *   // Use result.data safely
+   *   console.log(result.data.title);
+   * } else {
+   *   // Handle error case
+   *   console.error(result.error.userMessage);
+   * }
+   * ```
+   */
+  async safeIssue(id: string): Promise<LinearResult<Issue>> {
+    try {
+      const issue = await this.issue(id);
+      return createSuccessResult<Issue>(issue);
+    } catch (error) {
+      if (error instanceof LinearError) {
+        return createErrorResult<Issue>(error);
+      }
+      
+      const linearError = new LinearError(
+        `Error in safeIssue: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        LinearErrorType.UNKNOWN,
+        error
+      );
+      
+      return createErrorResult<Issue>(linearError);
     }
   }
 };

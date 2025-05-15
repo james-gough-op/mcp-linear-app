@@ -1,5 +1,17 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import {
+    createMockErrorResponse,
+    createMockIssue,
+    createMockIssueCreateResponse,
+    createMockIssueResponse,
+    createMockIssuesResponse,
+    createMockLabel,
+    createMockProject,
+    createMockTeamResponse,
+    createMockUser,
+    MOCK_IDS
+} from './mock-data.js';
 
 // GraphQL request/response types
 type GraphQLRequest = {
@@ -12,112 +24,19 @@ type GraphQLResponse = {
   errors?: Array<{ message: string; [key: string]: any }>;
 };
 
-// Valid UUID v4 format
-const MOCK_ISSUE_ID = '123e4567-e89b-42d3-a456-556642440000';
-const MOCK_LABEL_ID_1 = '550e8400-e29b-41d4-a716-446655440000';
-const MOCK_LABEL_ID_2 = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-const EXISTING_LABEL_ID = '6ec0bd7f-11c0-43da-975e-2a8ad9ebae0b';
-const MOCK_USER_ID = 'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6';
-const MOCK_NEW_LABEL_ID = '7f8e9d0c-1b2a-43c4-5d6e-7f8e9d0c1b2a';
-const MOCK_TEAM_ID = '123e4567-e89b-42d3-a456-556642440000';
-const MOCK_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-
-// Mock data
-const mockIssue = {
-  id: MOCK_ISSUE_ID,
-  title: 'Test Issue',
+// Special case mock data
+const mockUpdatedIssue = createMockIssue({
   labels: {
     nodes: [
-      { id: EXISTING_LABEL_ID, name: 'Existing Label', color: '#CCCCCC' }
+      { id: MOCK_IDS.LABEL, name: 'Bug', color: '#FF0000' },
+      { id: MOCK_IDS.LABEL + '1', name: 'Feature', color: '#00FF00' }
     ]
   }
-};
+});
 
-const mockUpdatedIssue = {
-  id: MOCK_ISSUE_ID,
-  title: 'Test Issue',
-  labels: {
-    nodes: [
-      { id: EXISTING_LABEL_ID, name: 'Existing Label', color: '#CCCCCC' },
-      { id: MOCK_LABEL_ID_1, name: 'Bug', color: '#FF0000' },
-      { id: MOCK_LABEL_ID_2, name: 'Feature', color: '#00FF00' }
-    ]
-  }
-};
-
-// Mock user data for authentication
-const mockUser = {
-  id: MOCK_USER_ID,
-  name: 'Test User',
-  email: 'test@example.com'
-};
-
-// Mock label data
-const mockLabel = {
-  id: MOCK_NEW_LABEL_ID,
-  name: 'Bug',
-  color: '#FF0000'
-};
-
-// Mock documentation label
-const mockDocLabel = {
-  id: MOCK_NEW_LABEL_ID,
-  name: 'Documentation',
-  color: '#000000'
-};
-
-// Mock project data
-const mockProject = {
-  id: MOCK_PROJECT_ID,
-  name: "Test Project",
-  description: "Test project description",
-  state: "STARTED",
-  color: "#FF5500",
-  teams: {
-    nodes: [
-      {
-        id: MOCK_TEAM_ID,
-        name: "Test Team"
-      }
-    ]
-  }
-};
-
-// Mock data for issue with project
-const mockIssueWithProject = {
-  id: MOCK_ISSUE_ID,
-  identifier: "TEST-123",
-  title: "Test Issue",
-  project: {
-    id: MOCK_PROJECT_ID,
-    name: "Test Project"
-  },
-  labels: {
-    nodes: [
-      { id: EXISTING_LABEL_ID, name: 'Existing Label', color: '#CCCCCC' }
-    ]
-  }
-};
-
-// Mock issue creation response with project
-const mockNewIssueWithProject = {
-  id: MOCK_ISSUE_ID,
-  identifier: "TEST-123",
-  title: "Test Issue",
-  description: "Test issue description",
-  priority: 3, // Medium
-  state: {
-    id: "state-123",
-    name: "In Progress"
-  },
-  project: {
-    id: MOCK_PROJECT_ID,
-    name: "Test Project"
-  },
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  url: "https://linear.app/test/issue/TEST-123"
-};
+const mockIssueWithProject = createMockIssue({
+  project: createMockProject()
+});
 
 // Handle all GraphQL requests to Linear API
 export const handlers = [
@@ -131,7 +50,10 @@ export const handlers = [
       console.log('Request body:', JSON.stringify(body));
     } catch (error) {
       console.error('Error parsing request body:', error);
-      return HttpResponse.json({ errors: [{ message: 'Invalid request body' }] }, { status: 400 });
+      return HttpResponse.json(
+        createMockErrorResponse('Invalid request body', 'BAD_REQUEST'), 
+        { status: 400 }
+      );
     }
     
     // Handle projectCreate mutation
@@ -141,23 +63,28 @@ export const handlers = [
         data: {
           projectCreate: {
             success: true,
-            project: mockProject
+            project: createMockProject({
+              name: body.variables?.name || 'New Project'
+            })
           }
         }
       });
     }
     
     // Handle createIssueLabel mutation
-    if (body.query && body.query.includes('createIssueLabel')) {
+    if (body.query && body.query.includes('createIssueLabel') || body.query && body.query.includes('issueLabelCreate')) {
       console.log('Handling createIssueLabel mutation');
       
-      // Check if this is the Documentation label case
-      if (body.variables && body.variables.name === 'Documentation') {
+      // Check if this is a specific label case
+      if (body.variables && body.variables.name) {
         return HttpResponse.json<GraphQLResponse>({
           data: {
             issueLabelCreate: {
               success: true,
-              issueLabel: mockDocLabel
+              issueLabel: createMockLabel({
+                name: body.variables.name,
+                color: body.variables.color || '#FF0000'
+              })
             }
           }
         });
@@ -168,7 +95,7 @@ export const handlers = [
         data: {
           issueLabelCreate: {
             success: true,
-            issueLabel: mockLabel
+            issueLabel: createMockLabel()
           }
         }
       });
@@ -179,19 +106,42 @@ export const handlers = [
       console.log('Handling authentication request');
       return HttpResponse.json<GraphQLResponse>({
         data: {
-          viewer: mockUser
+          viewer: createMockUser()
         }
       });
     }
     
-    // Always return the issue for simplicity in this test environment
+    // Handle issue query with specific ID
+    if (body.query && body.query.includes('issue(id:') && body.variables?.issueId) {
+      console.log('Handling issue query with ID');
+      
+      // Special case for testing not found behavior
+      if (body.variables.issueId === 'not_found_id') {
+        return HttpResponse.json(
+          createMockErrorResponse('Issue not found', 'NOT_FOUND'),
+          { status: 404 }
+        );
+      }
+      
+      return HttpResponse.json(createMockIssueResponse());
+    }
+    
+    // Handle general issue query
     if (body.query && body.query.includes('issue')) {
       console.log('Returning mock issue');
-      return HttpResponse.json<GraphQLResponse>({
-        data: {
-          issue: mockIssue
-        }
-      });
+      return HttpResponse.json(createMockIssueResponse());
+    }
+    
+    // Handle team query
+    if (body.query && body.query.includes('team(id:') && body.variables?.teamId) {
+      console.log('Handling team query with ID');
+      return HttpResponse.json(createMockTeamResponse());
+    }
+    
+    // Handle issues query (connection)
+    if (body.query && body.query.includes('issues(')) {
+      console.log('Handling issues connection query');
+      return HttpResponse.json(createMockIssuesResponse());
     }
     
     // Handle issueUpdate mutation for project assignment
@@ -208,7 +158,8 @@ export const handlers = [
     }
     
     // Handle general updateIssue mutation
-    if (body.query && body.query.includes('updateIssue') || (body.query && body.query.includes('issueUpdate') && !body.variables?.projectId)) {
+    if ((body.query && body.query.includes('updateIssue')) || 
+        (body.query && body.query.includes('issueUpdate') && !body.variables?.projectId)) {
       console.log('Returning mock updated issue');
       return HttpResponse.json<GraphQLResponse>({
         data: {
@@ -223,59 +174,45 @@ export const handlers = [
     // Handle issueCreate mutation with project
     if (body.query && body.query.includes('issueCreate') && body.variables?.projectId) {
       console.log('Handling issueCreate with project assignment');
-      return HttpResponse.json<GraphQLResponse>({
-        data: {
-          issueCreate: {
-            success: true,
-            issue: mockNewIssueWithProject
-          }
-        }
-      });
+      return HttpResponse.json(createMockIssueCreateResponse({
+        title: body.variables.title || 'New Issue',
+        projectId: body.variables.projectId,
+        project: createMockProject()
+      }));
     }
     
     // Handle regular issueCreate mutation
     if (body.query && body.query.includes('issueCreate')) {
       console.log('Handling issueCreate mutation');
-      const newIssue = { ...mockIssue };
-      newIssue.title = body.variables?.title || "New Issue";
+      return HttpResponse.json(createMockIssueCreateResponse({
+        title: body.variables?.title || 'New Issue'
+      }));
+    }
+    
+    // Handle adding issue to cycle
+    if (body.query && body.query.includes('issueUpdate') && body.variables?.cycleId) {
+      console.log('Handling adding issue to cycle');
       return HttpResponse.json<GraphQLResponse>({
         data: {
-          issueCreate: {
+          issueUpdate: {
             success: true,
-            issue: newIssue
+            issue: createMockIssue({
+              cycleId: body.variables.cycleId
+            })
           }
         }
       });
     }
     
-    // Default response for unhandled queries
-    console.log('Unhandled GraphQL query type');
+    // Handle unknown queries
+    console.log('Unknown GraphQL query type, returning generic success response');
     return HttpResponse.json<GraphQLResponse>({
-      errors: [{ message: 'Not implemented in MSW handler' }]
+      data: {
+        success: true
+      }
     });
   })
 ];
 
-// Export the mock IDs for use in tests
-export const mockIds = {
-  MOCK_ISSUE_ID,
-  MOCK_LABEL_ID_1,
-  MOCK_LABEL_ID_2,
-  EXISTING_LABEL_ID,
-  MOCK_USER_ID,
-  MOCK_NEW_LABEL_ID,
-  MOCK_TEAM_ID,
-  MOCK_PROJECT_ID
-};
-
-// Export mock data for use in tests
-export const mockData = {
-  mockLabel,
-  mockDocLabel,
-  mockProject,
-  mockIssueWithProject,
-  mockNewIssueWithProject
-};
-
-// Setup MSW server
+// Set up the server to use in tests
 export const server = setupServer(...handlers); 

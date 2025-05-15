@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Comment } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import linearClient, { enhancedClient } from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
 
@@ -62,7 +62,7 @@ export const LinearGetCommentTool = createSafeTool({
       }
       
       // Fetch the issue to verify it exists
-      const issue = await linearClient.issue(args.issueId);
+      const issue = await enhancedClient.issue(args.issueId);
       
       if (!issue) {
         return {
@@ -73,8 +73,9 @@ export const LinearGetCommentTool = createSafeTool({
         };
       }
       
-      // Fetch comments for the issue
-      const comments = await issue.comments();
+      // Fetch comments for the issue (using legacy client for compatibility)
+      const legacyIssue = await linearClient.issue(args.issueId);
+      const comments = await legacyIssue.comments();
       
       if (!comments || comments.nodes.length === 0) {
         return {

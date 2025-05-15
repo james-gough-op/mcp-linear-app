@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Comment, Issue, WorkflowState } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import linearClient, { enhancedClient } from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
@@ -119,8 +119,8 @@ export const LinearGetIssueTool = createSafeTool({
         };
       }
       
-      // Fetch the issue using the Linear client
-      const issue = await linearClient.issue(args.issueId);
+      // Fetch the issue using the new enhanced client
+      const issue = await enhancedClient.issue(args.issueId);
       
       // Return an error message if the issue doesn't exist
       if (!issue) {
@@ -132,10 +132,16 @@ export const LinearGetIssueTool = createSafeTool({
         };
       }
       
+      // For backward compatibility, we need to maintain the same behavior
+      // but work with the new structure. Here we'll use the issue data from the 
+      // enhanced client and get the comments using the old client for now.
+      
       // Safely fetch comments with error handling
       let comments: Comment[] = [];
       try {
-        const commentsQuery = await issue.comments();
+        // Continue using legacy client for comments for now, as it has the method pattern
+        const legacyIssue = await linearClient.issue(args.issueId);
+        const commentsQuery = await legacyIssue.comments();
         
         // Process and transform comments to a consistent format
         comments = await Promise.all(commentsQuery.nodes.map(async (comment) => {
@@ -180,10 +186,13 @@ export const LinearGetIssueTool = createSafeTool({
         } as Comment];
       }
 
-      // Safely fetch issue state/status with error handling
+      // Get state using the legacy client for consistency
       let status: WorkflowState | null = null;
       try {
-        const stateData = await issue.state;
+        // Continue using legacy client for state access
+        const legacyIssue = await linearClient.issue(args.issueId);
+        const stateData = await legacyIssue.state;
+        
         if (stateData) {
           status = {
             id: stateData.id || "unknown-id",
@@ -193,20 +202,52 @@ export const LinearGetIssueTool = createSafeTool({
           } as WorkflowState;
         }
       } catch {
-        // Fail gracefully if status can't be loaded
-        status = {
-          id: "status-error",
-          name: "Error loading status",
-          color: "#cccccc",
-          type: "error",
-        } as WorkflowState;
+        status = null;
       }
+      
+      // Access related issues through a different path or fetch them separately
+      // We might need to make a secondary query using linearClient
+      const legacyIssue = await linearClient.issue(args.issueId);
+      const childIssuesQuery = await legacyIssue.children();
       
       // Fetch sub-issues with error handling
       let subIssues: SubIssueData[] = [];
-      try {
-        // Get child issues using the Linear client
-        const childIssuesQuery = await issue.children();
+      if (childIssuesQuery && childIssuesQuery.nodes) {
+        // Process each sub-issue
+        for (const childIssue of childIssuesQuery.nodes) {
+          try {
+            // Get status for each sub-issue
+            let subIssueStatus: WorkflowState | null = null;
+            try {
+              const childStateData = await childIssue.state;
+              if (childStateData) {
+                subIssueStatus = {
+                  id: childStateData.id || "unknown-id",
+                  name: childStateData.name || "Unknown status",
+                  color: childStateData.color || "#cccccc",
+                  type: childStateData.type || "unknown",
+                } as WorkflowState;
+              }
+            } catch {
+              subIssueStatus = null;
+            }
+            
+            // Add sub-issue to the array
+            subIssues.push({
+              id: childIssue.id || "unknown-id",
+              title: childIssue.title || "No title",
+              priority: typeof childIssue.priority === 'number' ? childIssue.priority : 0,
+              status: subIssueStatus
+            });
+          } catch {
+            // Skip sub-issues that can't be processed
+            continue;
+          }
+        }
+      } else {
+        // Fallback to using old client for sub-issues
+        const legacyIssue = await linearClient.issue(args.issueId);
+        const childIssuesQuery = await legacyIssue.children();
         
         if (childIssuesQuery && childIssuesQuery.nodes) {
           // Process each sub-issue
@@ -241,9 +282,6 @@ export const LinearGetIssueTool = createSafeTool({
             }
           }
         }
-      } catch {
-        // Fail gracefully if sub-issues can't be loaded
-        subIssues = [];
       }
       
       // Use the issue directly as an Issue type

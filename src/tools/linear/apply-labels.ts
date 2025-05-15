@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Issue, IssueLabel } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import linearClient, { enhancedClient } from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { safeText } from '../../libs/utils.js';
@@ -90,7 +90,7 @@ export const LinearApplyLabelsTool = createSafeTool({
       }
       
       // First, get the issue to retrieve its current labels
-      const issue = await linearClient.issue(args.issueId);
+      const issue = await enhancedClient.issue(args.issueId);
       
       if (!issue) {
         return {
@@ -102,7 +102,9 @@ export const LinearApplyLabelsTool = createSafeTool({
       }
       
       // Retrieve current labels
-      const existingLabelsResult = await issue.labels();
+      // We need to use the legacy client for compatibility
+      const legacyIssue = await linearClient.issue(args.issueId);
+      const existingLabelsResult = await legacyIssue.labels();
       const existingLabelIds = existingLabelsResult ? 
         existingLabelsResult.nodes.map(label => label.id) : 
         [];
@@ -125,8 +127,11 @@ export const LinearApplyLabelsTool = createSafeTool({
       }
       
       // Get the updated issue with its labels
-      const updatedIssue = await linearClient.issue(args.issueId);
-      const updatedLabelsResult = await updatedIssue.labels();
+      const updatedIssue = await enhancedClient.issue(args.issueId);
+      
+      // For compatibility, use legacy client to get labels
+      const legacyUpdatedIssue = await linearClient.issue(args.issueId);
+      const updatedLabelsResult = await legacyUpdatedIssue.labels();
       
       // Convert the issue and labels to the expected types
       const issueData: Issue = {

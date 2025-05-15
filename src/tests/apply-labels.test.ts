@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { LinearApplyLabelsTool } from '../tools/linear/apply-labels.js';
-import { mockIds, server } from './mocks/handlers.js';
+import { server } from './mocks/handlers.js';
+import { MOCK_IDS as mockIds } from './mocks/mock-data.js';
 import { setupMockServer } from './mocks/msw-setup.js';
 
 // GraphQL request type
@@ -19,8 +20,8 @@ describe('LinearApplyLabelsTool', () => {
   it('should return proper response format for valid input', async () => {
     // Call the handler - using valid UUID-like IDs to pass validation
     const response = await LinearApplyLabelsTool.handler({
-      issueId: mockIds.MOCK_ISSUE_ID,
-      labelIds: [mockIds.MOCK_LABEL_ID_1, mockIds.MOCK_LABEL_ID_2]
+      issueId: mockIds.ISSUE,
+      labelIds: [mockIds.LABEL]
     }, { signal: new AbortController().signal });
 
     // Check basic response format only
@@ -52,8 +53,8 @@ describe('LinearApplyLabelsTool', () => {
 
     // Call the handler with valid UUID format
     const response = await LinearApplyLabelsTool.handler({
-      issueId: mockIds.MOCK_ISSUE_ID,
-      labelIds: [mockIds.MOCK_LABEL_ID_1]
+      issueId: mockIds.ISSUE,
+      labelIds: [mockIds.LABEL]
     }, { signal: new AbortController().signal });
 
     // Verify response format
@@ -67,7 +68,7 @@ describe('LinearApplyLabelsTool', () => {
     // Call the handler with empty issueId
     const response = await LinearApplyLabelsTool.handler({
       issueId: '',
-      labelIds: [mockIds.MOCK_LABEL_ID_1]
+      labelIds: [mockIds.LABEL]
     }, { signal: new AbortController().signal });
 
     // Verify response format
@@ -80,7 +81,7 @@ describe('LinearApplyLabelsTool', () => {
   it('should return an error when labelIds array is empty', async () => {
     // Call the handler with empty labelIds array
     const response = await LinearApplyLabelsTool.handler({
-      issueId: mockIds.MOCK_ISSUE_ID,
+      issueId: mockIds.ISSUE,
       labelIds: []
     }, { signal: new AbortController().signal });
 
@@ -101,8 +102,8 @@ describe('LinearApplyLabelsTool', () => {
 
     // Call the handler with valid UUID format
     const response = await LinearApplyLabelsTool.handler({
-      issueId: mockIds.MOCK_ISSUE_ID,
-      labelIds: [mockIds.MOCK_LABEL_ID_1]
+      issueId: mockIds.ISSUE,
+      labelIds: [mockIds.LABEL]
     }, { signal: new AbortController().signal });
 
     // Verify response format

@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
     Issue
 } from '../../generated/linear-types.js';
-import linearClient from '../../libs/client.js';
+import linearClient, { enhancedClient } from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
 
@@ -151,13 +151,9 @@ export const LinearUpdateIssueTool = createSafeTool({
       // Get the issue to update to retrieve its team ID
       let teamId: string | undefined;
       try {
-        const issueResponse = await linearClient.issue(args.id);
+        const issueResponse = await enhancedClient.issue(args.id);
         if (issueResponse) {
-          const issueData = await issueResponse;
-          const team = await issueData.team;
-          if (team) {
-            teamId = team.id;
-          }
+          teamId = issueResponse.team?.id;
         }
       } catch (error) {
         console.error("Error fetching issue for team ID:", error);
