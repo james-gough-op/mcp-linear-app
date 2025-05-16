@@ -1,7 +1,6 @@
 import { z } from "zod";
-import {
-  Comment
-} from '../../generated/linear-types.js';
+
+import { Comment } from "@linear/sdk";
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
@@ -54,7 +53,7 @@ export const LinearCreateCommentTool = createSafeTool({
       }
       
       // Create the comment
-      const createCommentResponse = await enhancedClient._createComment({
+      const createCommentResponse = await enhancedClient.safeCreateComment({
         body: args.comment,
         issueId: args.issueId,
       });

@@ -1,7 +1,8 @@
-import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { LinearErrorType } from '@linear/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import enhancedClient from '../libs/client.js';
+import { LinearError, LinearResult } from '../libs/errors.js';
 import { LinearCreateLabelTool } from '../tools/linear/create-label.js';
-import { server } from './mocks/handlers.js';
 import { setupMockServer } from './mocks/msw-setup.js';
 
 // Type for GraphQL request
@@ -13,8 +14,34 @@ type GraphQLRequest = {
 // Setup MSW for API mocking
 setupMockServer();
 
+// Mock enhancedClient.safeCreateIssueLabel
+vi.mock('../libs/client.js', () => {
+  return {
+    default: {
+      safeCreateIssueLabel: vi.fn()
+    }
+  };
+});
+
 describe('LinearCreateLabelTool', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('should successfully create a global label when teamId is not provided', async () => {
+    // Mock successful label creation
+    vi.mocked(enhancedClient.safeCreateIssueLabel).mockResolvedValueOnce({
+      success: true,
+      data: {
+        issueLabel: {
+          id: 'label-123',
+          name: 'Bug',
+          color: '#FF0000'
+        }
+      },
+      error: undefined
+    } as LinearResult<any>);
+
     // Call the handler directly
     const response = await LinearCreateLabelTool.handler({
       name: 'Bug',
@@ -29,6 +56,19 @@ describe('LinearCreateLabelTool', () => {
   });
 
   it('should use default color when not provided', async () => {
+    // Mock successful label creation
+    vi.mocked(enhancedClient.safeCreateIssueLabel).mockResolvedValueOnce({
+      success: true,
+      data: {
+        issueLabel: {
+          id: 'label-124',
+          name: 'Documentation',
+          color: '#000000'
+        }
+      },
+      error: undefined
+    } as LinearResult<any>);
+
     // Call the handler directly
     const response = await LinearCreateLabelTool.handler({
       name: 'Documentation'
@@ -54,12 +94,12 @@ describe('LinearCreateLabelTool', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    // Override the handler to simulate API error
-    server.use(
-      http.post('https://api.linear.app/graphql', () => {
-        return HttpResponse.error();
-      })
-    );
+    // Mock API error
+    vi.mocked(enhancedClient.safeCreateIssueLabel).mockResolvedValueOnce({
+      success: false,
+      data: undefined,
+      error: new LinearError('API Error: Network failure', LinearErrorType.NetworkError)
+    } as LinearResult<any>);
 
     // Call the handler
     const response = await LinearCreateLabelTool.handler({
@@ -74,24 +114,14 @@ describe('LinearCreateLabelTool', () => {
   });
 
   it('should handle failed label creation', async () => {
-    // Override the handler to simulate failed label creation
-    server.use(
-      http.post('https://api.linear.app/graphql', async ({ request }) => {
-        const body = await request.json() as GraphQLRequest;
-        
-        if (body.query && body.query.includes('createIssueLabel')) {
-          return HttpResponse.json({
-            data: {
-              issueLabelCreate: {
-                success: false
-              }
-            }
-          });
-        }
-        
-        return HttpResponse.json({ errors: [{ message: 'Unhandled request' }] });
-      })
-    );
+    // Mock unsuccessful label creation
+    vi.mocked(enhancedClient.safeCreateIssueLabel).mockResolvedValueOnce({
+      success: true,
+      data: {
+        success: false
+      },
+      error: undefined
+    } as LinearResult<any>);
 
     // Call the handler
     const response = await LinearCreateLabelTool.handler({
@@ -102,7 +132,7 @@ describe('LinearCreateLabelTool', () => {
     // Verify response format
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
-    expect(response.content[0].text).toContain('error');
+    expect(response.content[0].text).toContain('Failed to create');
   });
 
   it('should reject invalid color formats', async () => {

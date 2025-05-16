@@ -1,6 +1,7 @@
+import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
 import {
   createMockIssue,
   MOCK_IDS
@@ -12,8 +13,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   
   // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'executeGraphQLQuery');
-  vi.spyOn(enhancedClient, 'safeGetIssue');
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
 });
 
 afterEach(() => {
@@ -25,38 +25,35 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
+    // Mock the underlying GraphQL query instead
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValue({ success: true, data: { issue: mockIssue } });
     
-    // Temporarily replace the method with a mock function
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockResolvedValue(mockIssue);
+    // Act
+    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
     
-    try {
-      // Act
-      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
-      
-      // Assert
-      expect(result).toEqual(mockIssue);
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Assert
+    // The safeGetIssue method is expected to return a Result object
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(mockIssue);
     }
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalled();
   });
   
   // Error cases
   it('should throw validation error for invalid ID format', async () => {
-    // Arrange
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(
-      new LinearError('Invalid ID', LinearErrorType.VALIDATION)
-    );
+    // No need to mock safeExecuteGraphQLQuery here as validation should happen before
     
-    try {
-      // Act & Assert
-      await expect(enhancedClient.safeGetIssue('invalid-id')).rejects.toThrow(LinearError);
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Act
+    const result = await enhancedClient.safeGetIssue('invalid-id');
+    
+    // Assert
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBeInstanceOf(LinearError);
+      expect(result.error?.type).toBe("InvalidInput" as LinearErrorType);
     }
+    expect(enhancedClient.safeExecuteGraphQLQuery).not.toHaveBeenCalled();
   });
   
   // More tests...
@@ -67,85 +64,75 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return success result with issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockResolvedValue(mockIssue);
+    // Mock the underlying GraphQL query
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValue({ success: true, data: { issue: mockIssue } });
     
-    try {
-      // Act
-      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
-      
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockIssue);
-      expect(enhancedClient.safeGetIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Act
+    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    
+    // Assert
+    expect(result.success).toBe(true);
+    if (result.success) {
+        expect(result.data).toEqual(mockIssue);
     }
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
   });
   
   // Error case for validation error
   it('should return error result for invalid ID', async () => {
     // Arrange
-    const validationError = new LinearError('Invalid ID', LinearErrorType.VALIDATION);
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(validationError);
+    // Validation error should be thrown by the method itself before any GraphQL call
     
-    try {
-      // Act
-      const result = await enhancedClient.safeGetIssue('invalid-id');
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toEqual(validationError);
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Act
+    const result = await enhancedClient.safeGetIssue('invalid-id');
+    
+    // Assert
+    expect(result.success).toBe(false);
+    if (!result.success) {
+        expect(result.error).toBeInstanceOf(LinearError);
+        expect(result.error?.type).toBe("InvalidInput" as LinearErrorType);
     }
+    expect(result.data).toBeUndefined();
+    expect(enhancedClient.safeExecuteGraphQLQuery).not.toHaveBeenCalled();
   });
   
   // Error case for not found
   it('should return error result for not found issue', async () => {
     // Arrange
-    const notFoundError = new LinearError('Issue not found', LinearErrorType.NOT_FOUND);
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(notFoundError);
+    const notFoundError = new LinearError('Issue not found', "FeatureNotAccessible" as LinearErrorType);
+    // Mock the GraphQL query to simulate a "not found" scenario from the API
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockRejectedValue(notFoundError);
     
-    try {
-      // Act
-      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toEqual(notFoundError);
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Act
+    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    if (!result.success) {
+        expect(result.error).toEqual(notFoundError);
     }
+    expect(result.data).toBeUndefined();
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
   });
   
   // Unknown error conversion
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
     const unknownError = new Error('Some unexpected error');
-    const originalMethod = enhancedClient.safeGetIssue;
-    enhancedClient.safeGetIssue = vi.fn().mockRejectedValue(unknownError);
+    // Mock the GraphQL query to simulate an unexpected error
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockRejectedValue(unknownError);
     
-    try {
-      // Act
-      const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(LinearError);
-      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-      expect(result.error?.message).toContain('Some unexpected error');
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeGetIssue = originalMethod;
+    // Act
+    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    if (!result.success) {
+        expect(result.error).toBeInstanceOf(LinearError);
+        expect(result.error?.type).toBe("Unknown" as LinearErrorType);
+        expect(result.error?.message).toContain('Some unexpected error');
     }
+    expect(result.data).toBeUndefined();
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
   });
 }); 

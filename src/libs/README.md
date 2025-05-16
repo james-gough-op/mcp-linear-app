@@ -82,15 +82,7 @@ Contains ID validation utilities:
 - Validation functions for specific entity types
 - Type definitions for entity ID parameters
 
-### 4. `migration-utils.ts`
-
-Contains utilities specifically designed to assist in the migration:
-- GraphQL query builders for different entity types
-- Helper functions for entity field selection
-- Methods to transform SDK responses to GraphQL format
-- Utility functions for creating standardized method implementations
-
-### 5. `utils.ts`
+### 4. `utils.ts`
 
 Contains general utility functions:
 - Date formatting
@@ -157,18 +149,3 @@ See the `tests/` directory for examples of testing patterns, including:
 2. **Validation Tests**: Testing parameter validation
 3. **Error Handling Tests**: Testing API errors
 4. **Edge Case Tests**: Testing unusual scenarios
-
-## Migration Strategy
-
-1. Migrate core query methods first (get single entity)
-2. Migrate mutation methods next (create, update)
-3. Migrate list methods last (get multiple entities)
-4. Update consumer code incrementally as methods are migrated
-
-## Helper Utilities
-
-The `migration-utils.ts` file provides utilities to help with migration:
-- `buildGraphQLQuery`: Creates standardized queries
-- `createEntityMethod`: Creates method implementations with standard patterns
-- `createSafeMethod`: Creates non-throwing variants of methods
-- `compareClientResults`: Validates GraphQL responses match SDK responses 

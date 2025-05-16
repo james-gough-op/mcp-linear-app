@@ -1,5 +1,6 @@
+import { LinearErrorType } from '@linear/sdk';
 import { describe, expect, it } from 'vitest';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
 import {
     CreateIssueSchema,
     ID_PARAMETER_NAMES,
@@ -88,7 +89,7 @@ describe('Linear ID Management', () => {
         validateLinearId(invalidId, LinearEntityType.TEAM);
       } catch (error) {
         expect(error instanceof LinearError).toBe(true);
-        expect((error as LinearError).type).toBe(LinearErrorType.VALIDATION);
+        expect((error as LinearError).type).toBe(LinearErrorType.InvalidInput);
         expect((error as LinearError).message).toContain(LinearEntityType.TEAM);
       }
     });

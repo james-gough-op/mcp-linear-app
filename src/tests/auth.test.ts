@@ -1,6 +1,8 @@
+import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient, validateApiKey } from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { enhancedClient } from '../libs/client.js';
+import { LinearError } from '../libs/errors.js';
+import { validateApiKey } from '../libs/id-management.js';
 
 /**
  * Tests for Linear API authentication
@@ -74,7 +76,7 @@ describe('Linear API Authentication', () => {
       success: false,
       error: new LinearError(
         'Authentication failed', 
-        LinearErrorType.AUTHENTICATION,
+        LinearErrorType.AuthenticationError,
         null,
         401
       )

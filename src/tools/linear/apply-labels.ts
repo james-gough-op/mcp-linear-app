@@ -1,54 +1,8 @@
 import { z } from "zod";
-import { Issue, IssueLabel } from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { safeText } from '../../libs/utils.js';
 
-/**
- * Format the result of applying labels to human-readable text
- * @param issue The updated issue
- * @param appliedLabelIds IDs of the labels that were applied
- * @returns Formatted text for human readability
- */
-function formatApplyLabelsResult(issue: Issue, appliedLabelIds: string[]): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-
-  let result = "LABELS APPLIED TO LINEAR ISSUE\n";
-  result += "============================\n\n";
-  
-  // Basic issue information
-  result += `--- ISSUE DETAILS ---\n`;
-  result += `ID: ${issue.id}\n`;
-  result += `TITLE: ${safeText(issue.title)}\n\n`;
-  
-  // Labels information
-  result += `--- LABELS APPLIED ---\n`;
-  result += `Number of labels applied: ${appliedLabelIds.length}\n`;
-  
-  // Display current labels
-  if (issue.labels && issue.labels.nodes) {
-    const totalLabels = issue.labels.nodes.length;
-    result += `Total labels on issue: ${totalLabels}\n\n`;
-    
-    if (totalLabels > 0) {
-      result += `--- CURRENT LABELS ---\n`;
-      issue.labels.nodes.forEach((label: IssueLabel, index: number) => {
-        const isNewlyApplied = appliedLabelIds.includes(label.id);
-        result += `${index + 1}. ${safeText(label.name)} (${safeText(label.color)})${isNewlyApplied ? ' [newly applied]' : ''}\n`;
-      });
-      result += '\n';
-    }
-  } else {
-    result += `Unable to retrieve current labels list.\n\n`;
-  }
-  
-  result += "The labels have been successfully applied to the issue in Linear.";
-  
-  return result;
-}
 
 /**
  * Apply labels tool schema definition
@@ -140,7 +94,7 @@ export const LinearApplyLabelsTool = createSafeTool({
       const combinedLabelIds = [...new Set([...existingLabelIds, ...args.labelIds])];
       
       // Update the issue with the combined labels
-      const updateResponse = await enhancedClient._updateIssue(args.issueId, {
+      const updateResponse = await enhancedClient.safeUpdateIssue(args.issueId, {
         labelIds: combinedLabelIds,
       });
       
@@ -152,34 +106,11 @@ export const LinearApplyLabelsTool = createSafeTool({
           }],
         };
       }
-      
-      // Get the updated issue with its labels
-      const updatedIssue = await enhancedClient.safeGetIssue(args.issueId);
-      
-      // Query for updated labels
-      const updatedLabelsResult = await enhancedClient.safeExecuteGraphQLQuery<IssueLabelsResponse>(labelsQuery, { issueId: args.issueId });
-      
-      // Extract the labels
-      const labels = updatedLabelsResult.success && updatedLabelsResult.data?.issue?.labels?.nodes
-        ? updatedLabelsResult.data.issue.labels.nodes
-        : [];
-      
-      // Convert the issue and labels to the expected types
-      const issueData: Issue = {
-        id: updatedIssue.data?.id,
-        title: updatedIssue.data?.title,
-        labels: {
-          nodes: labels
-        }
-      } as unknown as Issue;
-      
-      // Format the result for human readability
-      const formattedResult = formatApplyLabelsResult(issueData, args.labelIds);
-      
+                  
       return {
         content: [{
           type: "text",
-          text: formattedResult,
+          text: "Status: Success\nMessage: Linear label applied",
         }],
       };
     } catch (error) {

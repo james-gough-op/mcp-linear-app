@@ -4,18 +4,7 @@
  * This module provides standardized error types and handlers for Linear API interactions.
  */
 
-/**
- * Standardized error types for Linear API errors
- */
-export enum LinearErrorType {
-  AUTHENTICATION = 'AUTHENTICATION',
-  PERMISSION = 'PERMISSION',
-  NOT_FOUND = 'NOT_FOUND',
-  RATE_LIMIT = 'RATE_LIMIT',
-  VALIDATION = 'VALIDATION',
-  NETWORK = 'NETWORK',
-  UNKNOWN = 'UNKNOWN'
-}
+import { LinearErrorType } from '@linear/sdk'; // Re-import from SDK
 
 /**
  * Standardized error class for Linear API errors
@@ -53,7 +42,7 @@ export class LinearError extends Error {
   
   constructor(
     message: string, 
-    type: LinearErrorType = LinearErrorType.UNKNOWN,
+    type: LinearErrorType = "Unknown" as LinearErrorType,
     originalError?: unknown,
     status?: number,
     retryAfter?: number,
@@ -75,25 +64,41 @@ export class LinearError extends Error {
    */
   get userMessage(): string {
     switch (this.type) {
-      case LinearErrorType.AUTHENTICATION:
+      case "AuthenticationError" as LinearErrorType:
         return `Authentication failed. Please check your Linear API key configuration.`;
       
-      case LinearErrorType.PERMISSION:
+      case "Forbidden" as LinearErrorType:
         return `Permission denied. Your API key lacks permission for this operation.`;
       
-      case LinearErrorType.NOT_FOUND:
+      case "FeatureNotAccessible" as LinearErrorType:
         return `Resource not found in Linear. Please check the ID or reference is correct.`;
       
-      case LinearErrorType.RATE_LIMIT:
+      case "Ratelimited" as LinearErrorType:
         return `Rate limit exceeded. Please wait ${this.retryAfter || 60} seconds before retrying.`;
       
-      case LinearErrorType.VALIDATION:
+      case "InvalidInput" as LinearErrorType: 
         return `Validation error with Linear API request. ${this.message}`;
       
-      case LinearErrorType.NETWORK:
+      case "NetworkError" as LinearErrorType:
         return `Network error when contacting Linear API. Please check your connection.`;
       
-      case LinearErrorType.UNKNOWN:
+      case "UserError" as LinearErrorType:
+        return `User error with Linear API request. ${this.message}`;
+
+      case "InternalError" as LinearErrorType:
+        return `Internal error with Linear API. Please contact support.`;
+      
+      case "GraphqlError" as LinearErrorType:
+        return `GraphQL error with Linear API request. ${this.message}`;
+      
+      case "LockTimeout" as LinearErrorType:
+        return `Lock timeout with Linear API request. Please try again later.`;
+      
+      case "BootstrapError" as LinearErrorType:
+        return `Bootstrap error with Linear API. Please contact support.`;
+      
+      case "Unknown" as LinearErrorType:
+      case "Other" as LinearErrorType:
       default:
         return `An error occurred with the Linear API: ${this.message}`;
     }
@@ -106,7 +111,7 @@ export class LinearError extends Error {
     if (!error) {
       return new LinearError(
         'Unknown error occurred with Linear API',
-        LinearErrorType.UNKNOWN
+        "Unknown" as LinearErrorType
       );
     }
     
@@ -136,7 +141,7 @@ export class LinearError extends Error {
     if (status === 401) {
       return new LinearError(
         'Authentication failed. Please check your Linear API key.',
-        LinearErrorType.AUTHENTICATION,
+        "AuthenticationError" as LinearErrorType,
         error,
         status
       );
@@ -145,7 +150,7 @@ export class LinearError extends Error {
     if (status === 403) {
       return new LinearError(
         'Permission denied. Your API key lacks permission for this operation.',
-        LinearErrorType.PERMISSION,
+        "Forbidden" as LinearErrorType,
         error,
         status
       );
@@ -154,7 +159,7 @@ export class LinearError extends Error {
     if (status === 404) {
       return new LinearError(
         'Resource not found in Linear.',
-        LinearErrorType.NOT_FOUND,
+        "FeatureNotAccessible" as LinearErrorType,
         error,
         status
       );
@@ -165,7 +170,7 @@ export class LinearError extends Error {
       const retryAfter = parseInt(response?.headers?.['retry-after'] || '60', 10);
       return new LinearError(
         `Rate limit exceeded. Retry after ${retryAfter} seconds.`,
-        LinearErrorType.RATE_LIMIT,
+        "Ratelimited" as LinearErrorType,
         error,
         status,
         retryAfter
@@ -190,7 +195,7 @@ export class LinearError extends Error {
           errorCode === 'NOT_FOUND') {
         return new LinearError(
           errorMessage,
-          LinearErrorType.NOT_FOUND,
+          "FeatureNotAccessible" as LinearErrorType,
           error,
           statusCode,
           undefined,
@@ -205,7 +210,7 @@ export class LinearError extends Error {
           errorCode === 'FORBIDDEN') {
         return new LinearError(
           errorMessage,
-          LinearErrorType.PERMISSION,
+          "Forbidden" as LinearErrorType,
           error,
           statusCode,
           undefined,
@@ -223,7 +228,7 @@ export class LinearError extends Error {
         
         return new LinearError(
           errorMessage,
-          LinearErrorType.RATE_LIMIT,
+          "Ratelimited" as LinearErrorType,
           error,
           statusCode,
           retryAfter,
@@ -238,7 +243,7 @@ export class LinearError extends Error {
           errorCode === 'GRAPHQL_PARSE_FAILED') {
         return new LinearError(
           errorMessage,
-          LinearErrorType.VALIDATION,
+          "InvalidInput" as LinearErrorType,
           error,
           statusCode,
           undefined,
@@ -254,7 +259,7 @@ export class LinearError extends Error {
           errorCode === 'UNAUTHENTICATED') {
         return new LinearError(
           errorMessage,
-          LinearErrorType.AUTHENTICATION,
+          "AuthenticationError" as LinearErrorType,
           error,
           statusCode,
           undefined,
@@ -266,7 +271,7 @@ export class LinearError extends Error {
       // Default to unknown for other GraphQL errors
       return new LinearError(
         errorMessage,
-        LinearErrorType.UNKNOWN,
+        "Unknown" as LinearErrorType,
         error,
         statusCode,
         undefined,
@@ -279,7 +284,7 @@ export class LinearError extends Error {
     if (errorObj.request && !errorObj.response) {
       return new LinearError(
         'Network error when contacting Linear API.',
-        LinearErrorType.NETWORK,
+          "NetworkError" as LinearErrorType,
         error
       );
     }
@@ -287,7 +292,7 @@ export class LinearError extends Error {
     // Fallback for any other errors
     return new LinearError(
       errorObj.message || 'Unknown error occurred with Linear API',
-      LinearErrorType.UNKNOWN,
+      "Unknown" as LinearErrorType,
       error
     );
   }

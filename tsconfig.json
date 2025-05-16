@@ -15,5 +15,5 @@
     "declaration": true,
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/generated/linear-types.ts"]
+  "exclude": ["node_modules", "dist"]
 }

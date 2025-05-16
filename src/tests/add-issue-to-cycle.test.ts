@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearResult } from '../libs/errors.js';
 import * as idManagement from '../libs/id-management.js';
 import { LinearAddIssueToCycleTool } from '../tools/linear/add-issue-to-cycle.js';
 
@@ -9,12 +8,14 @@ const MOCK_ISSUE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const MOCK_CYCLE_ID = '7f8e9d0c-1b2a-43c4-a716-446655440000';
 const INVALID_ID = 'not-a-valid-uuid';
 
-// Mock the GraphQL client response
-vi.mock('../libs/client.js', () => ({
-  enhancedClient: {
-    executeGraphQLMutation: vi.fn()
-  }
-}));
+// Setup mocks
+vi.mock('../libs/client.js', () => {
+  return {
+    default: {
+      executeGraphQLMutation: vi.fn()
+    }
+  };
+});
 
 // Sample successful response
 const successResponse = {
@@ -51,7 +52,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
   it('should successfully add an issue to a cycle', async () => {
     // Mock the enhanced client to return a successful response
-    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(successResponse as LinearResult<unknown>);
+    vi.mocked(enhancedClient.executeGraphQLMutation).mockResolvedValueOnce(successResponse);
 
     // Call the handler
     const response = await LinearAddIssueToCycleTool.handler({
@@ -60,7 +61,7 @@ describe('LinearAddIssueToCycleTool', () => {
     }, { signal: new AbortController().signal });
 
     // Verify client was called with correct parameters
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
+    expect(enhancedClient.executeGraphQLMutation).toHaveBeenCalledWith(
       expect.stringContaining('issueUpdate'),
       {
         issueId: MOCK_ISSUE_ID,
@@ -77,7 +78,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
   it('should handle failed update from Linear API', async () => {
     // Mock the enhanced client to return a failed response
-    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(failedResponse as LinearResult<unknown>);
+    vi.mocked(enhancedClient.executeGraphQLMutation).mockResolvedValueOnce(failedResponse);
 
     // Call the handler
     const response = await LinearAddIssueToCycleTool.handler({
@@ -98,7 +99,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: issueId: Invalid Linear ID format');
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+    expect(enhancedClient.executeGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject empty cycleId', async () => {
@@ -110,7 +111,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+    expect(enhancedClient.executeGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject invalid issueId format', async () => {
@@ -128,7 +129,7 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: issueId: Invalid Linear ID format');
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+    expect(enhancedClient.executeGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should reject invalid cycleId format', async () => {
@@ -147,12 +148,12 @@ describe('LinearAddIssueToCycleTool', () => {
 
     // Verify validation error
     expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+    expect(enhancedClient.executeGraphQLMutation).not.toHaveBeenCalled();
   });
 
   it('should handle API errors during the update', async () => {
     // Mock API error
-    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockRejectedValueOnce(
+    vi.mocked(enhancedClient.executeGraphQLMutation).mockRejectedValueOnce(
       new Error('API Error: Cycle not found')
     );
     

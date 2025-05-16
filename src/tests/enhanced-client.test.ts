@@ -1,9 +1,10 @@
+import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
 import {
-  createMockIssue,
-  MOCK_IDS
+    createMockIssue,
+    MOCK_IDS
 } from './mocks/mock-data.js';
 
 // Setup mocks
@@ -82,7 +83,7 @@ describe('enhancedClient.createIssue', () => {
     
     // Create our mock that will return a rejected promise - important for async tests
     const mockCreateIssueFn = vi.fn().mockRejectedValue(
-      new LinearError('Team ID is required', LinearErrorType.VALIDATION)
+      new LinearError('Team ID is required', LinearErrorType.InvalidInput)
     );
     
     // Replace the method
@@ -96,7 +97,7 @@ describe('enhancedClient.createIssue', () => {
       // Act & Assert
       await expect(mockCreateIssueFn(input)).rejects.toThrow('Team ID is required');
       await expect(mockCreateIssueFn(input)).rejects.toMatchObject({
-        type: LinearErrorType.VALIDATION
+        type: LinearErrorType.InvalidInput
       });
     } finally {
       // Restore original method
@@ -110,7 +111,7 @@ describe('enhancedClient.createIssue', () => {
     
     // Create our mock that will return a rejected promise
     const mockCreateIssueFn = vi.fn().mockRejectedValue(
-      new LinearError('Title is required', LinearErrorType.VALIDATION)
+      new LinearError('Title is required', LinearErrorType.InvalidInput)
     );
     
     // Replace the method
@@ -124,7 +125,7 @@ describe('enhancedClient.createIssue', () => {
       // Act & Assert
       await expect(mockCreateIssueFn(input)).rejects.toThrow('Title is required');
       await expect(mockCreateIssueFn(input)).rejects.toMatchObject({
-        type: LinearErrorType.VALIDATION
+        type: LinearErrorType.InvalidInput
       });
     } finally {
       // Restore original method
@@ -135,7 +136,7 @@ describe('enhancedClient.createIssue', () => {
   // API error case
   it('should pass through LinearError from GraphQL execution', async () => {
     // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
+    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
     
     // Store original methods
     const originalCreateIssue = enhancedClient.safeCreateIssue;

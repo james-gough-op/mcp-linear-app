@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { Issue, WorkflowState } from '../../generated/linear-types.js';
+
+import { Issue, WorkflowState } from "@linear/sdk";
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
 /**
  * Enum for Linear issue priorities as strings for schema
@@ -17,59 +17,6 @@ export const PriorityStringToNumber: Record<string, number> = {
   'medium': 3,
   'low': 4
 };
-
-/**
- * Format a single issue to human readable text
- * 
- * @param issue The issue data
- * @returns Formatted human readable text
- */
-function formatIssueToHumanReadable(issue: Issue): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-  
-  // Build formatted output
-  let result = "";
-  
-  // Basic issue information
-  result += `Id: ${issue.id}\n`;
-  result += `Title: ${safeText(issue.title)}\n`;
-  
-  // Improved status handling
-  let statusText = "No status yet";
-  if (issue.state) {
-    if (typeof issue.state === 'object' && issue.state?.name) {
-      statusText = issue.state.name;
-    } else if (typeof issue.state === 'string') {
-      // Handle case where state might be a string ID
-      statusText = "Status available (ID only)";
-    }
-  }
-  result += `Status: ${statusText}\n`;
-  
-  // Priority
-  result += `Priority: ${getPriorityLabel(issue.priority)}\n`;
-  
-  // Comments count if available - use a more flexible property access
-  // since it might be named differently in different API versions
-  const commentsCount = (issue as Issue & { commentCount?: number; commentsCount?: number }).commentCount || 
-                      (issue as Issue & { commentCount?: number; commentsCount?: number }).commentsCount || 
-                      0;
-  if (typeof commentsCount === 'number') {
-    result += `Comments: ${commentsCount}\n`;
-  }
-  
-  // Due date if present
-  if (issue.dueDate) {
-    result += `Due date: ${formatDate(issue.dueDate)}\n`;
-  }
-  
-  // URL
-  result += `Url: ${safeText(issue.url)}\n\n`;
-  
-  return result;
-}
 
 /**
  * Schema for search issues tool
@@ -104,7 +51,7 @@ export const LinearSearchIssuesTool = createSafeTool({
       // Fetch issues with pagination - we need to request more to handle skiping
       // Linear API has a first parameter but no skip/offset parameter
       const maxFetch = skip + limit;
-      const getAllIssues = await enhancedClient._issues(
+      const getAllIssues = await enhancedClient.safeIssues(
         {}, // Empty filter object
         maxFetch // Pass maxFetch as the 'first' parameter
       );
@@ -232,10 +179,6 @@ export const LinearSearchIssuesTool = createSafeTool({
       issuesText += "Note: Status display may not accurately reflect updated status due to API limitations.\n";
       issuesText += "Use 'get_issue' with specific issue ID to see accurate status information.\n\n";
       
-      // Add each formatted issue
-      for (const issue of paginatedNodes) {
-        issuesText += formatIssueToHumanReadable(issue);
-      }
       
       // Add pagination information
       const hasMoreIssues = endIndex < totalFilteredIssues;

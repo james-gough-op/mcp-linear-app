@@ -1,5 +1,5 @@
+import { Comment, User } from "@linear/sdk";
 import { z } from "zod";
-import { Comment } from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
@@ -26,7 +26,8 @@ function formatCommentsToHumanReadable(comments: Comment[]): string {
   let formattedText = `Comments (${comments.length}):\n\n`;
   
   comments.forEach((comment, index) => {
-    const userName = comment.user?.name || "Unknown User";
+    const user = comment.user as unknown as User;
+    const userName = user.name || "Unknown User";
     const formattedDate = formatDate(new Date(comment.createdAt));
     const commentBody = safeText(comment.body);
     

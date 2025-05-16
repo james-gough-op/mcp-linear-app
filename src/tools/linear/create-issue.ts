@@ -1,12 +1,8 @@
 import { z } from "zod";
-import {
-  Issue,
-  IssuePayload
-} from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
+import { getStateId, normalizeStateName } from '../../libs/utils.js';
 
 /**
  * Linear issue state constants
@@ -45,99 +41,6 @@ export const PriorityStringToNumber: Record<string, number> = {
   'low': LINEAR_ISSUE_PRIORITIES.LOW
 };
 
-/**
- * Format issue data into human-readable text
- * @param issue Issue data to format
- * @returns Formatted text for human readability
- */
-function formatIssueToHumanReadable(issue: Issue): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-
-  let result = "LINEAR ISSUE CREATED\n";
-  result += "==================\n\n";
-  
-  // Basic information
-  result += `--- ISSUE DETAILS ---\n`;
-  result += `ID: ${issue.id}\n`;
-  result += `TITLE: ${safeText(issue.title)}\n`;
-  result += `DESCRIPTION: ${safeText(issue.description)}\n\n`;
-  
-  // Status and priority
-  result += `--- STATUS INFO ---\n`;
-  if (issue.state && issue.state.name) {
-    result += `STATUS: ${issue.state.name}\n`;
-  }
-  result += `PRIORITY: ${getPriorityLabel(issue.priority)}\n\n`;
-  
-  // Parent information if exists
-  if (issue.parent && issue.parent.id) {
-    result += `--- PARENT ISSUE ---\n`;
-    result += `PARENT ID: ${issue.parent.id}\n`;
-    if (issue.parent.title) {
-      result += `PARENT TITLE: ${safeText(issue.parent.title)}\n`;
-    }
-    result += `\n`;
-  }
-  
-  // Project information if exists
-  if (issue.project) {
-    result += `--- PROJECT INFO ---\n`;
-    result += `PROJECT ID: ${issue.project.id}\n`;
-    if (issue.project.name) {
-      result += `PROJECT NAME: ${safeText(issue.project.name)}\n`;
-    }
-    result += `\n`;
-  }
-  
-  // Cycle information if exists
-  if (issue.cycle) {
-    result += `--- CYCLE INFO ---\n`;
-    result += `CYCLE ID: ${issue.cycle.id}\n`;
-    if (issue.cycle.name) {
-      result += `CYCLE NAME: ${safeText(issue.cycle.name)}\n`;
-    }
-    if (issue.cycle.number) {
-      result += `CYCLE NUMBER: ${issue.cycle.number}\n`;
-    }
-    result += `\n`;
-  }
-  
-  // Template information if exists
-  if (issue.lastAppliedTemplate) {
-    result += `--- TEMPLATE INFO ---\n`;
-    result += `TEMPLATE ID: ${issue.lastAppliedTemplate.id}\n`;
-    if (issue.lastAppliedTemplate.name) {
-      result += `TEMPLATE NAME: ${safeText(issue.lastAppliedTemplate.name)}\n`;
-    }
-    result += `\n`;
-  }
-  
-  // Team information
-  result += `--- TEAM INFO ---\n`;
-  if (issue.team && issue.team.name) {
-    result += `TEAM: ${issue.team.name}\n`;
-  }
-  
-  // Dates
-  result += `--- TIME INFO ---\n`;
-  result += `CREATED AT: ${formatDate(issue.createdAt)}\n`;
-  result += `UPDATED AT: ${formatDate(issue.updatedAt)}\n`;
-  
-  // Due date if present
-  if (issue.dueDate) {
-    result += `DUE DATE: ${formatDate(issue.dueDate)}\n`;
-  }
-  
-  // URL
-  result += `\n--- ACCESS INFO ---\n`;
-  result += `URL: ${safeText(issue.url)}\n\n`;
-  
-  result += "The issue has been successfully created in Linear.";
-  
-  return result;
-}
 
 /**
  * Create issue tool schema definition
@@ -267,8 +170,8 @@ export const LinearCreateIssueTool = createSafeTool({
         }
       }
 
-      // Create the issue using the enhanced client
-      const createIssueResponse = await enhancedClient._createIssue({
+      // Create the issue using the enhanced client's safe method
+      const createIssueResult = await enhancedClient.safeCreateIssue({
         title: args.title,
         description: args.description,
         stateId: stateId,
@@ -281,18 +184,26 @@ export const LinearCreateIssueTool = createSafeTool({
         templateId: args.templateId,
       });
       
-      if (!createIssueResponse) {
+      // Check if the operation was successful
+      if (!createIssueResult.success || !createIssueResult.data) {
+        // Handle error case
+        const errorMessage = createIssueResult.error 
+          ? createIssueResult.error.message 
+          : "Failed to create issue. Please check your parameters and try again.";
+        
         return {
           content: [{
             type: "text",
-            text: "Failed to create issue. Please check your parameters and try again.",
+            text: `Error: ${errorMessage}`,
           }],
         };
       }
       
+      // Extract the issue payload from the result
+      const createIssueResponse = createIssueResult.data;
+      
       // Getting issue ID from response
-      // Linear SDK returns results in success and entity pattern
-      if (createIssueResponse.success) {
+      if (createIssueResponse.issue) {
         // Access issue and get ID with correct data type
         const issue = await createIssueResponse.issue;
         if (issue && issue.id) {
@@ -322,11 +233,8 @@ export const LinearCreateIssueTool = createSafeTool({
         }
       }
       
-      // Extract data from response for other cases
-      const issueResponse = createIssueResponse as unknown as IssuePayload;
-      
-      // Check if the response follows the expected structure with success flag
-      if (issueResponse.success === false) {
+      // For cases where the issue field doesn't resolve properly
+      if (createIssueResponse.success === false) {
         return {
           content: [{
             type: "text",
@@ -335,95 +243,11 @@ export const LinearCreateIssueTool = createSafeTool({
         };
       }
       
-      // Extract issue data from the correct property
-      const issueData: Issue = 
-        (issueResponse.issue) || 
-        (createIssueResponse as unknown as Issue);
-      
-      // Directly check the parsed response result
-      const issueId = issueData?.id || (createIssueResponse as unknown as { id?: string })?.id;
-      if (issueId) {
-        // Include project, cycle, and template info in success message if available
-        const additionalInfo = [];
-        
-        if (args.projectId) {
-          additionalInfo.push(`Assigned to Project ID: ${args.projectId}`);
-        }
-        
-        if (args.cycleId) {
-          additionalInfo.push(`Assigned to Cycle ID: ${args.cycleId}`);
-        }
-        
-        if (args.templateId) {
-          additionalInfo.push(`Template applied: ${args.templateId}`);
-        }
-        
-        const additionalInfoText = additionalInfo.length > 0 ? `\n${additionalInfo.join('\n')}` : '';
-        
-        return {
-          content: [{
-            type: "text",
-            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueId}${additionalInfoText}`,
-          }],
-        };
-      }
-      
-      if (!issueData) {
-        // Display success message even if data is incomplete
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear issue created",
-          }],
-        };
-      }
-      
-      if (!issueData.id) {
-        // Issue data exists but no ID
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear issue created (ID not available)",
-          }],
-        };
-      }
-      
-      // Success case with ID available
-      if (issueData.title === undefined && issueData.description === undefined) {
-        // Only ID is available, without complete data
-        // Include project, cycle, and template info in success message if available
-        const additionalInfo = [];
-        
-        if (args.projectId) {
-          additionalInfo.push(`Assigned to Project ID: ${args.projectId}`);
-        }
-        
-        if (args.cycleId) {
-          additionalInfo.push(`Assigned to Cycle ID: ${args.cycleId}`);
-        }
-        
-        if (args.templateId) {
-          additionalInfo.push(`Template applied: ${args.templateId}`);
-        }
-        
-        const additionalInfoText = additionalInfo.length > 0 ? `\n${additionalInfo.join('\n')}` : '';
-        
-        return {
-          content: [{
-            type: "text",
-            text: `Status: Success\nMessage: Linear issue created\nIssue ID: ${issueData.id}${additionalInfoText}`,
-          }],
-        };
-      }
-      
-      // Format issue data to human-readable text
-      const formattedText = formatIssueToHumanReadable(issueData);
-      
-      // Return formatted text
+      // Fallback for success case with minimal information
       return {
         content: [{
           type: "text",
-          text: formattedText,
+          text: "Status: Success\nMessage: Linear issue created",
         }],
       };
     } catch (error) {

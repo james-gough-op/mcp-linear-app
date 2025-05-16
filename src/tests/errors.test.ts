@@ -1,10 +1,10 @@
+import { LinearErrorType } from '@linear/sdk';
 import { describe, expect, it } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import {
-    LinearError,
-    LinearErrorType,
-    createErrorResult,
-    createSuccessResult
+  LinearError,
+  createErrorResult,
+  createSuccessResult
 } from '../libs/errors.js';
 
 /**
@@ -19,12 +19,12 @@ describe('Linear Error Handling', () => {
       // Test error creation with different types
       const authError = new LinearError(
         'Authentication failed', 
-        LinearErrorType.AUTHENTICATION, 
+        "AuthenticationError" as LinearErrorType, 
         null, 
         401
       );
       
-      expect(authError.type).toBe(LinearErrorType.AUTHENTICATION);
+      expect(authError.type).toBe("AuthenticationError" as LinearErrorType);
       expect(authError.message).toContain('Authentication');
       expect(authError.status).toBe(401);
       
@@ -35,7 +35,7 @@ describe('Linear Error Handling', () => {
       // Test rate limit error with retry-after
       const rateLimitError = new LinearError(
         'Rate limit exceeded',
-        LinearErrorType.RATE_LIMIT,
+        "Ratelimited" as LinearErrorType,
         null,
         429,
         30
@@ -64,7 +64,7 @@ describe('Linear Error Handling', () => {
       
       const parsedAuthError = LinearError.fromGraphQLError(mockAuthError);
       
-      expect(parsedAuthError.type).toBe(LinearErrorType.AUTHENTICATION);
+      expect(parsedAuthError.type).toBe("AuthenticationError" as LinearErrorType);
       expect(parsedAuthError.status).toBe(401);
     });
     
@@ -89,7 +89,7 @@ describe('Linear Error Handling', () => {
       
       const parsedRateLimitError = LinearError.fromGraphQLError(mockRateLimitError);
       
-      expect(parsedRateLimitError.type).toBe(LinearErrorType.RATE_LIMIT);
+      expect(parsedRateLimitError.type).toBe("Ratelimited" as LinearErrorType);
       expect(parsedRateLimitError.retryAfter).toBe(45);
     });
     
@@ -112,7 +112,7 @@ describe('Linear Error Handling', () => {
       
       const parsedValidationError = LinearError.fromGraphQLError(mockValidationError);
       
-      expect(parsedValidationError.type).toBe(LinearErrorType.VALIDATION);
+      expect(parsedValidationError.type).toBe("InvalidInput" as LinearErrorType);
     });
   });
 
@@ -129,7 +129,7 @@ describe('Linear Error Handling', () => {
     
     it('should create error result objects correctly', () => {
       // Test error result
-      const error = new LinearError('Test error', LinearErrorType.VALIDATION);
+      const error = new LinearError('Test error', "InvalidInput" as LinearErrorType);
       const errorResult = createErrorResult(error);
       
       expect(errorResult.success).toBe(false);
@@ -156,7 +156,7 @@ describe('Linear Error Handling', () => {
       // The Linear API sometimes returns these errors as UNKNOWN instead of VALIDATION
       // Accept either for the test to pass
       if (result.error) {
-        expect([LinearErrorType.VALIDATION, LinearErrorType.UNKNOWN]).toContain(result.error.type);
+        expect(["InvalidInput" as LinearErrorType, "Unknown" as LinearErrorType]).toContain(result.error.type);
         
         // Check that the error message contains information about the invalid field
         expect(result.error.message).toContain('thisFieldDoesNotExist');

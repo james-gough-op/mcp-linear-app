@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LinearResult } from '../libs/errors.js';
 import { MockLinearClient } from '../tests/mocks/MockLinearClient.js';
 import { MockLinearResponses } from '../tests/mocks/linearResponses.js';
 
@@ -40,8 +41,57 @@ vi.doMock('../libs/id-management.js', async () => {
   return { LinearIdSchema: mockLinearIdSchema };
 });
 
+// Mock client.js with enhanced client
 vi.doMock('../libs/client.js', async () => {
   mockClient = new MockLinearClient();
+  
+  // Convert the safeCreateIssue method to a proper vitest mock function
+  mockClient.safeCreateIssue = vi.fn();
+  
+  // Default implementation
+  mockClient.safeCreateIssue.mockImplementation((input) => {
+    // Record the call for verification
+    mockClient.mockResponseFor('safeCreateIssue', input);
+    
+    // Default success response
+    const successResponse = {
+      success: true,
+      data: {
+        success: true,
+        issue: {
+          id: MOCK_ISSUE_ID,
+          title: input.title || "Test Issue",
+          description: input.description || ""
+        },
+        lastSyncId: 123
+      },
+      error: undefined
+    };
+    
+    // Return customized responses based on input
+    if (input.templateId) {
+      return Promise.resolve({
+        success: true,
+        data: MockLinearResponses.createIssueWithTemplateSuccess,
+        error: undefined
+      } as LinearResult<any>);
+    } else if (input.projectId) {
+      return Promise.resolve({
+        success: true,
+        data: MockLinearResponses.createIssueWithProjectSuccess,
+        error: undefined
+      } as LinearResult<any>);
+    } else if (input.cycleId) {
+      return Promise.resolve({
+        success: true,
+        data: MockLinearResponses.createIssueWithCycleSuccess,
+        error: undefined
+      } as LinearResult<any>);
+    }
+    
+    return Promise.resolve(successResponse as LinearResult<any>);
+  });
+  
   return {
     __esModule: true,
     default: mockClient,
@@ -58,11 +108,33 @@ describe('LinearCreateIssueTool with Template Support', () => {
 
     // Reset the mock client for each test
     mockClient.reset();
+    
+    // Clear all mocks
+    vi.clearAllMocks();
   });
 
   it('should create an issue with a template', async () => {
-    // Mock successful response with template info
-    mockClient.mockResponseFor('createIssue', MockLinearResponses.createIssueWithTemplateSuccess);
+    // Create a custom template response
+    const templateResponse = {
+      success: true,
+      data: {
+        success: true,
+        issue: {
+          id: MOCK_ISSUE_ID,
+          title: "Test Issue with Template",
+          description: "This is a test issue using a template",
+          lastAppliedTemplate: {
+            id: MOCK_TEMPLATE_ID,
+            name: "Test Template" 
+          }
+        },
+        lastSyncId: 123
+      },
+      error: undefined
+    };
+    
+    // Mock the safeCreateIssue method
+    mockClient.safeCreateIssue.mockResolvedValueOnce(templateResponse);
 
     // Call the handler
     const result = await LinearCreateIssueTool.handler({
@@ -76,13 +148,15 @@ describe('LinearCreateIssueTool with Template Support', () => {
     expect(result.content[0].text).toContain('Linear issue created');
     expect(result.content[0].text).toContain(MOCK_TEMPLATE_ID);
 
-    // Verify the client was called with expected args
-    expect(mockClient.verifyCall('createIssue', {
-      title: 'Test Issue with Template',
-      description: 'This is a test issue using a template',
-      teamId: MOCK_TEAM_ID,
-      templateId: MOCK_TEMPLATE_ID,
-    })).toBe(true);
+    // Verify the method was called with expected args
+    expect(mockClient.safeCreateIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Test Issue with Template',
+        description: 'This is a test issue using a template',
+        teamId: MOCK_TEAM_ID,
+        templateId: MOCK_TEMPLATE_ID,
+      })
+    );
   });
 
   it('should reject invalid template ID', async () => {
@@ -99,7 +173,7 @@ describe('LinearCreateIssueTool with Template Support', () => {
     expect(result.content[0].text).toContain('Invalid Linear ID format');
 
     // Verify no API call was made
-    expect(mockClient.getCallCount('createIssue')).toBe(0);
+    expect(mockClient.safeCreateIssue).not.toHaveBeenCalled();
   });
 
   it('should create an issue with project, cycle and template all together', async () => {
@@ -110,37 +184,42 @@ describe('LinearCreateIssueTool with Template Support', () => {
     // Create a custom response that includes project, cycle and template
     const customResponse = {
       success: true,
-      issue: {
-        id: 'issue_mock_combined',
-        title: 'Combined Issue',
-        description: 'With project, cycle and template',
-        state: {
-          id: 'state_mock_123',
-          name: 'Todo'
+      data: {
+        success: true,
+        issue: {
+          id: 'issue_mock_combined',
+          title: 'Combined Issue',
+          description: 'With project, cycle and template',
+          state: {
+            id: 'state_mock_123',
+            name: 'Todo'
+          },
+          priority: 2,
+          team: {
+            id: MOCK_TEAM_ID,
+            name: 'Mock Team',
+            key: 'MOCK'
+          },
+          project: {
+            id: MOCK_PROJECT_ID,
+            name: 'Mock Project'
+          },
+          cycle: {
+            id: MOCK_CYCLE_ID,
+            name: 'Mock Cycle',
+            number: 4
+          },
+          lastAppliedTemplate: {
+            id: MOCK_TEMPLATE_ID,
+            name: 'Mock Template'
+          }
         },
-        priority: 2,
-        team: {
-          id: MOCK_TEAM_ID,
-          name: 'Mock Team',
-          key: 'MOCK'
-        },
-        project: {
-          id: MOCK_PROJECT_ID,
-          name: 'Mock Project'
-        },
-        cycle: {
-          id: MOCK_CYCLE_ID,
-          name: 'Mock Cycle',
-          number: 4
-        },
-        lastAppliedTemplate: {
-          id: MOCK_TEMPLATE_ID,
-          name: 'Mock Template'
-        }
-      }
+        lastSyncId: 123
+      },
+      error: undefined
     };
     
-    mockClient.mockResponseFor('createIssue', customResponse);
+    mockClient.safeCreateIssue.mockResolvedValueOnce(customResponse);
 
     // Call the handler with all optional parameters
     const result = await LinearCreateIssueTool.handler({
@@ -160,41 +239,48 @@ describe('LinearCreateIssueTool with Template Support', () => {
     expect(result.content[0].text).toContain(MOCK_CYCLE_ID);
     expect(result.content[0].text).toContain(MOCK_TEMPLATE_ID);
 
-    // Verify the client was called with expected args including all IDs
-    expect(mockClient.verifyCall('createIssue', {
-      teamId: MOCK_TEAM_ID,
-      projectId: MOCK_PROJECT_ID,
-      cycleId: MOCK_CYCLE_ID,
-      templateId: MOCK_TEMPLATE_ID,
-    })).toBe(true);
+    // Verify the method was called with expected args
+    expect(mockClient.safeCreateIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        teamId: MOCK_TEAM_ID,
+        projectId: MOCK_PROJECT_ID,
+        cycleId: MOCK_CYCLE_ID,
+        templateId: MOCK_TEMPLATE_ID,
+      })
+    );
   });
 
   it('should format template information in the response', async () => {
     // Create a custom response that includes template information
     const customResponse = {
       success: true,
-      issue: {
-        id: MOCK_ISSUE_ID,
-        title: 'Template Issue',
-        description: 'Using a special template',
-        state: {
-          id: MOCK_STATE_ID,
-          name: 'Todo'
+      data: {
+        success: true,
+        issue: {
+          id: MOCK_ISSUE_ID,
+          title: 'Template Issue',
+          description: 'Using a special template',
+          state: {
+            id: MOCK_STATE_ID,
+            name: 'Todo'
+          },
+          priority: 2,
+          team: {
+            id: MOCK_TEAM_ID,
+            name: 'Engineering',
+            key: 'ENG'
+          },
+          lastAppliedTemplate: {
+            id: MOCK_TEMPLATE_ID,
+            name: 'Bug Report Template'
+          }
         },
-        priority: 2,
-        team: {
-          id: MOCK_TEAM_ID,
-          name: 'Engineering',
-          key: 'ENG'
-        },
-        lastAppliedTemplate: {
-          id: MOCK_TEMPLATE_ID,
-          name: 'Bug Report Template'
-        }
-      }
+        lastSyncId: 123
+      },
+      error: undefined
     };
     
-    mockClient.mockResponseFor('createIssue', customResponse);
+    mockClient.safeCreateIssue.mockResolvedValueOnce(customResponse);
 
     // Call the handler
     const result = await LinearCreateIssueTool.handler({
@@ -208,10 +294,34 @@ describe('LinearCreateIssueTool with Template Support', () => {
     expect(result.content[0].text).toContain('Linear issue created');
     expect(result.content[0].text).toContain('Template applied: ' + MOCK_TEMPLATE_ID);
     
-    // If the formatIssueToHumanReadable function includes template info in extended output
     if (result.content[0].text.includes('TEMPLATE INFO')) {
       expect(result.content[0].text).toContain('TEMPLATE INFO');
       expect(result.content[0].text).toContain('Bug Report Template');
     }
+  });
+  
+  it('should handle error responses from the API', async () => {
+    // Mock an error response
+    const errorResponse = {
+      success: false,
+      data: undefined,
+      error: {
+        message: 'API error: Team not found',
+        type: 'NetworkError'
+      }
+    };
+    
+    mockClient.safeCreateIssue.mockResolvedValueOnce(errorResponse);
+    
+    // Call the handler
+    const result = await LinearCreateIssueTool.handler({
+      teamId: 'invalid-team-id',
+      title: 'Test Issue',
+      description: 'This should fail'
+    });
+    
+    // Verify error is properly shown
+    expect(result.content[0].text).toContain('Error:');
+    expect(result.content[0].text).toContain('API error: Team not found');
   });
 }); 

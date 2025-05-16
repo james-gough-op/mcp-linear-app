@@ -2,7 +2,6 @@ import { z } from "zod";
 import enhancedClient from '../../libs/client.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { safeText } from '../../libs/utils.js';
 
 /**
  * GraphQL mutation for assigning an issue to a project
@@ -56,43 +55,6 @@ const assignIssueToProjectSchema = z.object({
 });
 
 /**
- * Format the updated issue data into human-readable text
- * @param issue Updated issue data to format
- * @param projectId The ID of the project the issue was assigned to
- * @returns Formatted text for human readability
- */
-function formatAssignmentResult(issue: any, projectId: string): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-
-  let result = "ISSUE ASSIGNED TO PROJECT\n";
-  result += "=========================\n\n";
-  
-  // Basic issue information
-  result += `--- ISSUE DETAILS ---\n`;
-  result += `ID: ${issue.id}\n`;
-  
-  if (issue.identifier) {
-    result += `IDENTIFIER: ${issue.identifier}\n`;
-  }
-  
-  result += `TITLE: ${safeText(issue.title)}\n\n`;
-  
-  // Project information
-  result += `--- PROJECT DETAILS ---\n`;
-  result += `PROJECT ID: ${projectId}\n`;
-  
-  if (issue.project) {
-    result += `PROJECT NAME: ${safeText(issue.project.name)}\n`;
-  }
-  
-  result += "\nThe issue has been successfully assigned to the project in Linear.";
-  
-  return result;
-}
-
-/**
  * Assign Issue to Project tool implementation
  */
 export const LinearAssignIssueToProjectTool = createSafeTool({
@@ -102,22 +64,40 @@ export const LinearAssignIssueToProjectTool = createSafeTool({
   handler: async (args: z.infer<typeof assignIssueToProjectSchema>) => {
     try {
       // Execute the GraphQL mutation
-      const response = await enhancedClient.executeGraphQLMutation<IssueUpdateResponse>(
+      const response = await enhancedClient.safeExecuteGraphQLMutation<IssueUpdateResponse>(
         ASSIGN_ISSUE_TO_PROJECT_MUTATION,
         {
           issueId: args.issueId,
           projectId: args.projectId
         }
       );
-      
-      // Format and return response
-      if (response.data?.issueUpdate?.success) {
-        const updatedIssue = response.data.issueUpdate.issue;
+
+      // Check if the operation was successful
+      if (!response.success || !response.data) {
+        // Handle error case
+        const errorMessage = response.error 
+          ? response.error.message 
+          : "Failed to assign issue to project. Please check your parameters and try again.";
         
         return {
           content: [{
             type: "text",
-            text: formatAssignmentResult(updatedIssue, args.projectId)
+            text: `Error: ${errorMessage}`,
+          }],
+        };
+      }
+
+      // Extract the payload from the result
+      const assignIssueToProjectResponse = response.data;
+      
+      // Format and return response
+      if (assignIssueToProjectResponse.issueUpdate?.success) {
+        const updatedIssue = assignIssueToProjectResponse.issueUpdate.issue;
+        
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully assigned issue "${updatedIssue.title}" (${updatedIssue.identifier}) to project "${updatedIssue.project?.name}" (ID: ${args.projectId}).`
           }]
         };
       }

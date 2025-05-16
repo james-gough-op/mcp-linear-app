@@ -5,14 +5,15 @@
  * Linear uses UUIDs (v4) for all entity identifiers.
  */
 
+import { LinearErrorType } from '@linear/sdk';
 import { z } from 'zod';
-import { LinearError, LinearErrorType } from './errors.js';
+import { LinearError } from './errors.js';
 
 /**
  * Regular expression for validating UUID v4 format
  * Linear entity IDs follow this format
  */
-export const LINEAR_ID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const LINEAR_ID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/i;
 
 /**
  * Zod schema for validating Linear entity IDs
@@ -72,19 +73,26 @@ export interface LinearId {
  * @throws {LinearError} When ID validation fails
  */
 export function validateLinearId(id: string, entityType: LinearEntityType): void {
-  try {
-    LinearIdSchema.parse(id);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      // Create a standardized Linear error
-      throw new LinearError(
-        `Invalid ${entityType} ID format: ${error.errors[0].message}`,
-        LinearErrorType.VALIDATION,
-        error
-      );
-    }
-    throw error;
+  if (typeof id !== 'string' || id.trim() === '') { // Basic check for non-empty string
+    throw new LinearError(
+      `Invalid ${entityType} ID: Must be a non-empty string. Received: ${id}`,
+      "InvalidInput" as LinearErrorType
+    );
   }
+  if (!LINEAR_ID_REGEX.test(id)) { // Direct regex test
+    throw new LinearError(
+      `Invalid ${entityType} ID format: Linear IDs must be valid UUID v4 strings. Received: ${id}`,
+      "InvalidInput" as LinearErrorType,
+      new z.ZodError([{ // Mimic ZodError structure for consistency if other code expects it
+        path: [],
+        message: "Invalid Linear ID format. Linear IDs must be valid UUID v4 strings.",
+        code: z.ZodIssueCode.invalid_string,
+        validation: "regex",
+      }])
+    );
+  }
+  // If we reach here, the ID is considered valid by the direct regex test.
+  // No Zod parse for regex needed if LINEAR_ID_REGEX.test is reliable here.
 }
 
 /**
@@ -165,4 +173,26 @@ export const CreateIssueSchema = z.object({
   labelIds: z.array(createEntitySchema(LinearEntityType.LABEL)).optional(),
   cycleId: createEntitySchema(LinearEntityType.CYCLE, false),
   projectId: createEntitySchema(LinearEntityType.PROJECT, false)
-}); 
+});
+
+/**
+ * Validates that the Linear API key is present and has the correct format.
+ * Linear API keys typically start with "lin_api_" followed by a string of alphanumeric characters.
+ */
+export function validateApiKey(apiKey: string | undefined): { valid: boolean; message?: string } {
+  if (!apiKey) {
+    return { 
+      valid: false, 
+      message: 'LINEAR_API_KEY environment variable is not set. Please add it to your .env file.' 
+    };
+  }
+
+  const linearKeyPattern = /^lin_api_[a-zA-Z0-9]+$/;
+  if (!linearKeyPattern.test(apiKey)) {
+    return { 
+      valid: false, 
+      message: 'LINEAR_API_KEY has an invalid format. Linear API keys should start with "lin_api_" followed by alphanumeric characters.' 
+    };
+  }
+  return { valid: true };
+} 

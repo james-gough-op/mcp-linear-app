@@ -1,313 +1,128 @@
-import { LinearClient, LinearDocument } from '@linear/sdk';
+import {
+  Comment,
+  CommentPayload,
+  Cycle,
+  CycleConnection,
+  CyclePayload,
+  DeletePayload,
+  Issue,
+  IssueConnection,
+  IssueLabelPayload,
+  IssuePayload,
+  LinearClient,
+  LinearDocument,
+  LinearErrorType,
+  LinearRawResponse,
+  Team,
+  TeamConnection,
+  User
+} from '@linear/sdk';
 import dotenv from 'dotenv';
 
 import {
   LinearError,
-  LinearErrorType,
   LinearResult,
   createErrorResult,
   createSuccessResult,
   logLinearError
 } from './errors.js';
-import { LinearEntityType, validateLinearId } from './id-management.js';
+import { LinearEntityType, validateApiKey, validateLinearId } from './id-management.js';
 
 // Load environment variables
 dotenv.config();
 
 // Get the API key from environment variable
-const apiKey = process.env.LINEAR_API_KEY;
+const envApiKey = process.env.LINEAR_API_KEY;
 
-/**
- * Validates that the Linear API key is present and has the correct format
- * Linear API keys typically start with "lin_api_" followed by a string of alphanumeric characters
- */
-export function validateApiKey(apiKey: string | undefined): { valid: boolean; message?: string } {
-  if (!apiKey) {
-    return { 
-      valid: false, 
-      message: 'LINEAR_API_KEY environment variable is not set. Please add it to your .env file.' 
-    };
+class EnhancedLinearClient {
+  private linearSdkClient: LinearClient;
+
+  constructor(apiKey?: string) {
+    const keyToUse = apiKey || envApiKey;
+    const validatedKey = validateApiKey(keyToUse);
+    if (!validatedKey.valid) {
+      // Consider how to handle this: throw, log, or allow SDK to handle empty/invalid key
+      console.warn(`Linear API Key issue: ${validatedKey.message || 'Validation failed.'}`);
+    }
+    this.linearSdkClient = new LinearClient({ apiKey: keyToUse || '' });
   }
 
-  // Basic format check - Linear API keys typically start with "lin_api_" followed by alphanumeric characters
-  const linearKeyPattern = /^lin_api_[a-zA-Z0-9]+$/;
-  
-  if (!linearKeyPattern.test(apiKey)) {
-    return { 
-      valid: false, 
-      message: 'LINEAR_API_KEY has an invalid format. Linear API keys should start with "lin_api_" followed by alphanumeric characters.' 
-    };
+  public get client() {
+    return this.linearSdkClient.client;
   }
 
-  return { valid: true };
-}
-
-// Create a Linear client instance with the API key
-const originalLinearClient = new LinearClient({
-  apiKey: apiKey ?? '',
-});
-
-/**
- * Type for GraphQL response with data
- */
-export interface GraphQLResponse<T = Record<string, unknown>> {
-  data: T;
-  extensions?: Record<string, unknown>;
-}
-
-// Type for raw Linear API response to handle undefined data
-interface LinearRawResponse<T> {
-  data?: T;
-  extensions?: unknown;
-}
-
-/**
- * Adapted User type for client use
- * Takes the most essential properties from SDK User type
- */
-export type ClientUser = Pick<LinearDocument.User, 'id' | 'name' | 'displayName' | 'email' | 'active' | 'admin' | 'avatarUrl' | 'createdAt' | 'updatedAt' | 'lastSeen'> & {
-  organization?: Pick<LinearDocument.Organization, 'id' | 'name' | 'urlKey'>;
-  teams?: {
-    nodes: Pick<LinearDocument.Team, 'id' | 'name' | 'key'>[];
-  };
-};
-
-/**
- * Adapted Team type for client use
- */
-export type ClientTeam = Pick<LinearDocument.Team, 'id' | 'name' | 'key' | 'description' | 'color' | 'icon' | 'private' | 'createdAt' | 'updatedAt'> & {
-  states?: {
-    nodes: Pick<LinearDocument.WorkflowState, 'id' | 'name' | 'color' | 'type'>[];
-  };
-  labels?: {
-    nodes: Pick<LinearDocument.IssueLabel, 'id' | 'name' | 'color'>[];
-  };
-  members?: {
-    nodes: Pick<LinearDocument.User, 'id' | 'name' | 'displayName' | 'email'>[];
-  };
-};
-
-/**
- * Adapted WorkflowState type for client use
- */
-export type ClientWorkflowState = Pick<LinearDocument.WorkflowState, 'id' | 'name' | 'color' | 'type'>;
-
-/**
- * Adapted Label type for client use
- */
-export type ClientLabel = Pick<LinearDocument.IssueLabel, 'id' | 'name' | 'color'>;
-
-/**
- * Adapted Project type for client use
- */
-export type ClientProject = Pick<LinearDocument.Project, 'id' | 'name'>;
-
-/**
- * Adapted Cycle type for client use
- */
-export type ClientCycle = Pick<LinearDocument.Cycle, 'id' | 'name' | 'number'>;
-
-/**
- * Interface for a complete Linear Issue
- * Based on the generated Issue type but with simplified structure
- */
-export type ClientIssue = Pick<
-  LinearDocument.Issue,
-  | 'id'
-  | 'title'
-  | 'description'
-  | 'number'
-  | 'priority'
-  | 'priorityLabel'
-  | 'estimate'
-  | 'branchName'
-  | 'dueDate'
-  | 'snoozedUntilAt'
-  | 'completedAt'
-  | 'canceledAt'
-  | 'autoClosedAt'
-  | 'archivedAt'
-  | 'startedAt'
-  | 'createdAt'
-  | 'updatedAt'
-  | 'boardOrder'
-  | 'sortOrder'
-  | 'subIssueSortOrder'
-> & {
-  team?: Pick<LinearDocument.Team, 'id' | 'name' | 'key'>;
-  cycle?: Pick<LinearDocument.Cycle, 'id' | 'name' | 'number'>;
-  project?: Pick<LinearDocument.Project, 'id' | 'name'>;
-  state?: Pick<LinearDocument.WorkflowState, 'id' | 'name' | 'color' | 'type'>;
-  labels?: {
-    nodes: Pick<LinearDocument.IssueLabel, 'id' | 'name' | 'color'>[];
-  };
-  assignee?: Pick<LinearDocument.User, 'id' | 'name' | 'displayName' | 'email'>;
-  creator?: Pick<LinearDocument.User, 'id' | 'name'>;
-  parent?: Pick<LinearDocument.Issue, 'id' | 'title'>;
-  children?: {
-    nodes: Pick<LinearDocument.Issue, 'id' | 'title'>[];
-  };
-};
-
-/**
- * Enhanced Linear client with additional GraphQL functionality
- * We use explicit GraphQL queries for better type safety instead of relying on SDK methods
- */
-const enhancedClient = {
-  // Expose original client for direct SDK access
-  client: originalLinearClient.client,
-  
-  // Helper methods for GraphQL operations
-  /**
-   * Execute a raw GraphQL query with optional variables
-   * @param query The GraphQL query string
-   * @param variables Optional variables for the query
-   * @returns The parsed response data
-   * @throws {LinearError} Standardized error object
-   */
-  async executeGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>> {
+  public async executeGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>> {
     try {
-      const response = await originalLinearClient.client.rawRequest<T, Record<string, unknown>>(query, variables || {});
-      return response;
+      const response = await this.linearSdkClient.client.rawRequest<T, Record<string, unknown>>(
+        query,
+        variables || {}
+      );
+      return response as LinearRawResponse<T>;
     } catch (error) {
-      // Convert to standardized error format
-      const linearError = LinearError.fromGraphQLError(error);
-      
-      // Log error details with context
-      logLinearError(linearError, { 
-        query, 
-        variables,
-        operation: 'query'
-      });
-      
-      // Rethrow with standardized format
-      throw linearError;
+      throw LinearError.fromGraphQLError(error);
     }
-  },
-  
-  /**
-   * Execute a GraphQL mutation with optional variables
-   * @param mutation The GraphQL mutation string
-   * @param variables Optional variables for the mutation
-   * @returns The parsed response data
-   * @throws {LinearError} Standardized error object
-   */
-  async executeGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>> {
+  }
+
+  public async executeGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>> {
     try {
-      const response = await originalLinearClient.client.rawRequest<T, Record<string, unknown>>(mutation, variables || {});
-      return response;
+      const response = await this.linearSdkClient.client.rawRequest<T, Record<string, unknown>>(
+        mutation,
+        variables || {}
+      );
+      return response as LinearRawResponse<T>;
     } catch (error) {
-      // Convert to standardized error format
-      const linearError = LinearError.fromGraphQLError(error);
-      
-      // Log error details with context
-      logLinearError(linearError, { 
-        query: mutation, 
-        variables,
-        operation: 'mutation'
-      });
-      
-      // Rethrow with standardized format
-      throw linearError;
+      throw LinearError.fromGraphQLError(error);
     }
-  },
-  
-  /**
-   * Execute a GraphQL query with built-in error handling
-   * Returns a result object instead of throwing exceptions
-   * 
-   * @param query The GraphQL query string
-   * @param variables Optional variables for the query
-   * @returns LinearResult object with success/error information
-   */
-  async safeExecuteGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
+  }
+
+  public async safeExecuteGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
     try {
-      const response = await this.executeGraphQLQuery<T>(query, variables);
+      const response = await this.executeGraphQLQuery<T>(query, variables); // Call class method
       return createSuccessResult<T>(response.data as T);
     } catch (error) {
       if (error instanceof LinearError) {
         return createErrorResult<T>(error);
       }
-      
-      // Convert other errors to LinearError
       const linearError = new LinearError(
         error instanceof Error ? error.message : 'Unknown error',
-        LinearErrorType.UNKNOWN,
+        "Unknown" as LinearErrorType,
         error
       );
-      
       return createErrorResult<T>(linearError);
     }
-  },
-  
-  /**
-   * Execute a GraphQL mutation with built-in error handling
-   * Returns a result object instead of throwing exceptions
-   * 
-   * @param mutation The GraphQL mutation string
-   * @param variables Optional variables for the mutation
-   * @returns LinearResult object with success/error information
-   */
-  async safeExecuteGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
+  }
+
+  public async safeExecuteGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
     try {
-      const response = await this.executeGraphQLMutation<T>(mutation, variables);
+      const response = await this.executeGraphQLMutation<T>(mutation, variables); // Call class method
       return createSuccessResult<T>(response.data as T);
     } catch (error) {
       if (error instanceof LinearError) {
         return createErrorResult<T>(error);
       }
-      
-      // Convert other errors to LinearError
       const linearError = new LinearError(
         error instanceof Error ? error.message : 'Unknown error',
-        LinearErrorType.UNKNOWN,
+        "Unknown" as LinearErrorType,
         error
       );
-      
       return createErrorResult<T>(linearError);
     }
-  },
+  }
   
-  /**
-   * Execute GraphQL query or mutation with Result pattern instead of exceptions
-   * @param query The GraphQL query or mutation string
-   * @param variables Optional variables
-   * @returns LinearResult object containing either data or error
-   */
-  async safeExecuteGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
+  public async safeExecuteGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<LinearResult<T>> {
     try {
-      const response = await originalLinearClient.client.rawRequest<T, Record<string, unknown>>(query, variables || {});
+      const response = await this.linearSdkClient.client.rawRequest<T, Record<string, unknown>>(query, variables || {});
       return createSuccessResult<T>(response.data as T);
     } catch (error) {
-      // Convert to standardized error format
       const linearError = LinearError.fromGraphQLError(error);
-      
-      // Log error details with context
-      logLinearError(linearError, { 
-        query, 
-        variables,
-        operation: 'query/mutation'
-      });
-      
-      // Return error result
+      logLinearError(linearError, { query, variables, operation: 'query/mutation'});
       return createErrorResult<T>(linearError);
     }
-  },
-  
-  /**
-   * Get an issue by ID
-   * 
-   * @param id The issue ID to retrieve
-   * @returns The issue object with all its properties
-   * @throws {LinearError} With NOT_FOUND type if issue doesn't exist
-   * @throws {LinearError} With VALIDATION type if ID format is invalid
-   */
-  async _getIssue(id: string): Promise<LinearDocument.Issue> {
+  }
+
+  private async _getIssue(id: string): Promise<Issue> {
     try {
-      // 1. Validate parameters
       validateLinearId(id, LinearEntityType.ISSUE);
-      
-      // 2. Define GraphQL query with all required fields
       const query = `
         query GetIssue($issueId: String!) {
           issue(id: $issueId) {
@@ -393,105 +208,36 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // 3. Execute query with variables
       const variables = { issueId: id };
-      const result = await this.safeExecuteGraphQLQuery<{ issue: LinearDocument.Issue }>(query, variables);
-      
-      // 4. Validate response
+      const result = await this.safeExecuteGraphQLQuery<{ issue: Issue }>(query, variables);
       if (!result.success || !result.data?.issue) {
         throw new LinearError(
           result.error?.message || `Issue with ID ${id} not found`,
-          result.error?.type || LinearErrorType.NOT_FOUND,
+          result.error?.type || LinearErrorType.FeatureNotAccessible,
           result.error?.originalError
         );
       }
-      
-      // 5. Return typed data
       return result.data.issue;
     } catch (error) {
-      // 6. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 7. Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching issue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Get an issue by ID with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `getIssue()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully retrieved
-   * issue or error information.
-   *
-   * @param id The issue ID to retrieve
-   * @returns LinearResult containing either:
-   *          - success: true with issue data for valid requests
-   *          - success: false with error information for invalid inputs or not found issues
-   * @example
-   * ```typescript
-   * const result = await enhancedClient.safeGetIssue("ISS-123");
-   * if (result.success) {
-   *   // Use result.data safely
-   *   console.log(result.data.title);
-   * } else {
-   *   // Handle error case
-   *   console.error(result.error.userMessage);
-   * }
-   * ```
-   */
-  async safeGetIssue(id: string): Promise<LinearResult<LinearDocument.Issue>> {
+  }
+  public async safeGetIssue(id: string): Promise<LinearResult<Issue>> {
     try {
       const issue = await this._getIssue(id);
-      return createSuccessResult<LinearDocument.Issue>(issue);
+      return createSuccessResult<Issue>(issue);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.Issue>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeGetIssue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.Issue>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<Issue>(error); }
+      const linearError = new LinearError(`Error in safeGetIssue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<Issue>(linearError);
     }
-  },
-  
-  /**
-   * Create a new issue in Linear
-   * 
-   * @param input The issue creation input containing required fields like teamId and title
-   * @returns The created issue payload containing the issue object and success flag
-   * @throws {LinearError} With VALIDATION type if required fields are missing
-   * @throws {LinearError} With various types for API errors
-   */
-  async _createIssue(input: LinearDocument.IssueCreateInput): Promise<LinearDocument.IssuePayload> {
+  }
+
+  private async _createIssue(input: LinearDocument.IssueCreateInput): Promise<IssuePayload> {
     try {
-      // 1. Validate required parameters
-      if (!input.teamId) {
-        throw new LinearError(
-          'Team ID is required',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      if (!input.title) {
-        throw new LinearError(
-          'Title is required',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      // 2. Define GraphQL mutation with all required fields
+      if (!input.teamId) { throw new LinearError('Team ID is required', LinearErrorType.InvalidInput); }
+      if (!input.title) { throw new LinearError('Title is required', LinearErrorType.InvalidInput); }
       const mutation = `
         mutation CreateIssue($input: IssueCreateInput!) {
           issueCreate(input: $input) {
@@ -561,106 +307,32 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // 3. Execute mutation with variables
       const variables = { input };
-      const result = await this.safeExecuteGraphQLMutation<{ issueCreate: LinearDocument.IssuePayload }>(mutation, variables);
-      
-      // 4. Validate response
+      const result = await this.safeExecuteGraphQLMutation<{ issueCreate: IssuePayload }>(mutation, variables);
       if (!result.success || !result.data?.issueCreate) {
-        throw new LinearError(
-          result.error?.message || 'Failed to create issue',
-          result.error?.type || LinearErrorType.UNKNOWN,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || 'Failed to create issue', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // 5. Return typed data
       return result.data.issueCreate;
     } catch (error) {
-      // 6. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 7. Convert other errors to LinearError
-      throw new LinearError(
-        `Error creating issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error creating issue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Create a new issue in Linear with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `createIssue()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully created
-   * issue payload or error information.
-   *
-   * @param input The issue creation input
-   * @returns LinearResult containing either:
-   *          - success: true with issue payload for valid requests
-   *          - success: false with error information for invalid inputs or API errors
-   * @example
-   * ```typescript
-   * const result = await enhancedClient.safeCreateIssue({ 
-   *   teamId: "team123", 
-   *   title: "New Feature" 
-   * });
-   * if (result.success) {
-   *   // Use result.data safely
-   *   console.log(result.data.issue.id);
-   * } else {
-   *   // Handle error case
-   *   console.error(result.error.userMessage);
-   * }
-   * ```
-   */
-  async safeCreateIssue(input: LinearDocument.IssueCreateInput): Promise<LinearResult<LinearDocument.IssuePayload>> {
+  }
+  public async safeCreateIssue(input: LinearDocument.IssueCreateInput): Promise<LinearResult<IssuePayload>> {
     try {
-      const result = await this._createIssue(input);
-      return createSuccessResult<LinearDocument.IssuePayload>(result);
+      const resultData = await this._createIssue(input);
+      return createSuccessResult<IssuePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.IssuePayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeCreateIssue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.IssuePayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<IssuePayload>(error); }
+      const linearError = new LinearError(`Error in safeCreateIssue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<IssuePayload>(linearError);
     }
-  },
+  }
 
-  /**
-   * Update an existing issue in Linear
-   * 
-   * @param id The issue ID to update
-   * @param input The issue update input containing fields to update
-   * @returns The updated issue payload containing the issue object and success flag
-   * @throws {LinearError} With VALIDATION type if ID format is invalid or input is empty
-   * @throws {LinearError} With NOT_FOUND type if issue doesn't exist
-   * @throws {LinearError} With various types for API errors
-   */
-  async _updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearDocument.IssuePayload> {
+  private async _updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<IssuePayload> {
     try {
-      // 1. Validate the issue ID
       validateLinearId(id, LinearEntityType.ISSUE);
-      
-      // 2. Validate input - in this case, ensure at least one field is provided
-      if (Object.keys(input).length === 0) {
-        throw new LinearError(
-          'At least one field must be provided for update',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      // 3. Define GraphQL mutation with all required fields
+      if (Object.keys(input).length === 0) { throw new LinearError('At least one field must be provided for update', LinearErrorType.InvalidInput); }
       const mutation = `
         mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
           issueUpdate(id: $id, input: $input) {
@@ -730,102 +402,34 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // 4. Execute mutation with variables
       const variables = { id, input };
-      const result = await this.safeExecuteGraphQLMutation<{ issueUpdate: LinearDocument.IssuePayload }>(mutation, variables);
-      
-      // 5. Validate response
+      const result = await this.safeExecuteGraphQLMutation<{ issueUpdate: IssuePayload }>(mutation, variables);
       if (!result.success || !result.data?.issueUpdate) {
-        throw new LinearError(
-          result.error?.message || `Failed to update issue with ID ${id}`,
-          result.error?.type || LinearErrorType.UNKNOWN,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || `Failed to update issue with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // 6. Return typed data
       return result.data.issueUpdate;
     } catch (error) {
-      // 7. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 8. Convert other errors to LinearError
-      throw new LinearError(
-        `Error updating issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error updating issue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Update an existing issue in Linear with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `updateIssue()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully updated
-   * issue payload or error information.
-   *
-   * @param id The issue ID to update
-   * @param input The issue update input containing fields to update
-   * @returns LinearResult containing either:
-   *          - success: true with issue payload for valid requests
-   *          - success: false with error information for invalid inputs, not found issues, or API errors
-   * @example
-   * ```typescript
-   * const result = await enhancedClient.safeUpdateIssue("ISS-123", { 
-   *   title: "Updated Title" 
-   * });
-   * if (result.success) {
-   *   // Use result.data safely
-   *   console.log(result.data.issue.title);
-   * } else {
-   *   // Handle error case
-   *   console.error(result.error.userMessage);
-   * }
-   * ```
-   */
-  async safeUpdateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearResult<LinearDocument.IssuePayload>> {
+  }
+  public async safeUpdateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<LinearResult<IssuePayload>> {
     try {
-      const result = await this._updateIssue(id, input);
-      return createSuccessResult<LinearDocument.IssuePayload>(result);
+      const resultData = await this._updateIssue(id, input);
+      return createSuccessResult<IssuePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.IssuePayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeUpdateIssue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.IssuePayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<IssuePayload>(error); }
+      const linearError = new LinearError(`Error in safeUpdateIssue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<IssuePayload>(linearError);
     }
-  },
-  
-  /**
-   * Fetch multiple issues based on filter criteria
-   * 
-   * @param filter Optional filter to apply to issues query
-   * @param first Maximum number of issues to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @returns IssueConnection containing nodes and pagination info
-   * @throws {LinearError} With VALIDATION type if filter is invalid
-   * @throws {LinearError} With various types for API errors
-   */
-  async _issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearDocument.IssueConnection> {
+  }
+
+  private async _issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<IssueConnection> {
     try {
-      // Define GraphQL query with all required fields
       const query = `
         query GetIssues($filter: IssueFilter, $first: Int, $after: String) {
           issues(filter: $filter, first: $first, after: $after) {
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
+            pageInfo { hasNextPage endCursor }
             nodes {
               id
               title
@@ -878,99 +482,36 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // Execute query with variables
       const variables = { filter, first, after };
-      const result = await this.safeExecuteGraphQLQuery<{ issues: LinearDocument.IssueConnection }>(query, variables);
-      
-      // Validate response
+      const result = await this.safeExecuteGraphQLQuery<{ issues: IssueConnection }>(query, variables);
       if (!result.success || !result.data?.issues) {
-        throw new LinearError(
-          result.error?.message || 'Failed to fetch issues',
-          result.error?.type || LinearErrorType.UNKNOWN,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || 'Failed to fetch issues', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // Return typed data
       return result.data.issues;
     } catch (error) {
-      // Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching issues: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching issues: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Fetch multiple issues with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `issues()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully retrieved
-   * issues or error information.
-   *
-   * @param filter Optional filter to apply to issues query
-   * @param first Maximum number of issues to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @returns LinearResult containing either issues data or error information
-   */
-  async safeIssues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearResult<LinearDocument.IssueConnection>> {
+  }
+  public async safeIssues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<LinearResult<IssueConnection>> {
     try {
-      const result = await this._issues(filter, first, after);
-      return createSuccessResult<LinearDocument.IssueConnection>(result);
+      const resultData = await this._issues(filter, first, after);
+      return createSuccessResult<IssueConnection>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.IssueConnection>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeIssues: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.IssueConnection>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<IssueConnection>(error); }
+      const linearError = new LinearError(`Error in safeIssues: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<IssueConnection>(linearError);
     }
-  },
+  }
 
-  /**
-   * Create a new comment
-   * 
-   * @param input The comment creation input containing required fields
-   * @returns The created comment payload containing the comment object and success flag
-   * @throws {LinearError} With VALIDATION type if required fields are missing
-   * @throws {LinearError} With various types for API errors
-   */
-  async _createComment(input: LinearDocument.CommentCreateInput): Promise<LinearDocument.CommentPayload> {
+  private async _createComment(input: LinearDocument.CommentCreateInput): Promise<CommentPayload> {
     try {
-      // 1. Validate required parameters
       if (!input.issueId && !input.documentContentId && !input.projectUpdateId && !input.initiativeUpdateId && !input.postId) {
-        throw new LinearError(
-          'At least one context ID is required (issueId, documentContentId, etc.)',
-          LinearErrorType.VALIDATION
-        );
+        throw new LinearError('At least one context ID is required', LinearErrorType.InvalidInput);
       }
+      if (!input.body) { throw new LinearError('Comment body is required', LinearErrorType.InvalidInput); }
+      if (input.issueId) { validateLinearId(input.issueId, LinearEntityType.ISSUE); }
       
-      if (!input.body) {
-        throw new LinearError(
-          'Comment body is required',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      // 2. Validate issueId if provided
-      if (input.issueId) {
-        validateLinearId(input.issueId, LinearEntityType.ISSUE);
-      }
-      
-      // 3. Define GraphQL mutation with all required fields
       const mutation = `
         mutation CreateComment($input: CommentCreateInput!) {
           commentCreate(input: $input) {
@@ -995,92 +536,32 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // 4. Execute mutation with variables
       const variables = { input };
-      const result = await this.safeExecuteGraphQLMutation<{ commentCreate: LinearDocument.CommentPayload }>(mutation, variables);
-      
-      // 5. Validate response
+      const result = await this.safeExecuteGraphQLMutation<{ commentCreate: CommentPayload }>(mutation, variables);
       if (!result.success || !result.data?.commentCreate) {
-        throw new LinearError(
-          result.error?.message || 'Failed to create comment',
-          result.error?.type || LinearErrorType.UNKNOWN,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || 'Failed to create comment', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // 6. Return typed data
       return result.data.commentCreate;
     } catch (error) {
-      // 7. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 8. Convert other errors to LinearError
-      throw new LinearError(
-        `Error creating comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error creating comment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Create a new comment in Linear with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `createComment()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully created
-   * comment payload or error information.
-   *
-   * @param input The comment creation input
-   * @returns LinearResult containing either:
-   *          - success: true with comment payload for valid requests
-   *          - success: false with error information for invalid inputs or API errors
-   */
-  async safeCreateComment(input: LinearDocument.CommentCreateInput): Promise<LinearResult<LinearDocument.CommentPayload>> {
+  }
+  public async safeCreateComment(input: LinearDocument.CommentCreateInput): Promise<LinearResult<CommentPayload>> {
     try {
-      const result = await this._createComment(input);
-      return createSuccessResult<LinearDocument.CommentPayload>(result);
+      const resultData = await this._createComment(input);
+      return createSuccessResult<CommentPayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.CommentPayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeCreateComment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.CommentPayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<CommentPayload>(error); }
+      const linearError = new LinearError(`Error in safeCreateComment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<CommentPayload>(linearError);
     }
-  },
-  
-  /**
-   * Update an existing comment
-   * 
-   * @param id The comment ID to update
-   * @param input The comment update input containing fields to update
-   * @returns The updated comment payload containing the comment object and success flag
-   * @throws {LinearError} With VALIDATION type if ID format is invalid or input is empty
-   * @throws {LinearError} With NOT_FOUND type if comment doesn't exist
-   * @throws {LinearError} With various types for API errors
-   */
-  async _updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearDocument.CommentPayload> {
+  }
+
+  private async _updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<CommentPayload> {
     try {
-      // 1. Validate the comment ID
       validateLinearId(id, LinearEntityType.COMMENT);
-      
-      // 2. Validate input - ensure at least body is provided
-      if (!input.body) {
-        throw new LinearError(
-          'Comment body is required for update',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      // 3. Define GraphQL mutation with all required fields
+      if (!input.body) { throw new LinearError('Comment body is required for update', LinearErrorType.InvalidInput); }
       const mutation = `
         mutation UpdateComment($id: String!, $input: CommentUpdateInput!) {
           commentUpdate(id: $id, input: $input) {
@@ -1105,416 +586,131 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // 4. Execute mutation with variables
       const variables = { id, input };
-      const response = await this.executeGraphQLMutation<{ commentUpdate: LinearDocument.CommentPayload }>(mutation, variables);
-      
-      // 5. Validate response
-      if (!response.data || !response.data.commentUpdate) {
-        throw new LinearError(
-          `Failed to update comment with ID ${id}`,
-          LinearErrorType.UNKNOWN
-        );
+      // Note: Original used executeGraphQLMutation directly, changed to safeExecute for consistency pattern, but this means handling its Result
+      const result = await this.safeExecuteGraphQLMutation<{ commentUpdate: CommentPayload }>(mutation, variables);
+      if (!result.success || !result.data?.commentUpdate) {
+         throw new LinearError(result.error?.message || `Failed to update comment with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError );
       }
-      
-      // 6. Return typed data
-      return response.data.commentUpdate;
+      return result.data.commentUpdate;
     } catch (error) {
-      // 7. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 8. Convert other errors to LinearError
-      throw new LinearError(
-        `Error updating comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error updating comment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Update an existing comment with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `updateComment()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully updated
-   * comment payload or error information.
-   *
-   * @param id The comment ID to update
-   * @param input The comment update input containing fields to update
-   * @returns LinearResult containing either:
-   *          - success: true with comment payload for valid requests
-   *          - success: false with error information for invalid inputs, not found comments, or API errors
-   */
-  async safeUpdateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearResult<LinearDocument.CommentPayload>> {
+  }
+  public async safeUpdateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearResult<CommentPayload>> {
     try {
-      const result = await this._updateComment(id, input);
-      return createSuccessResult<LinearDocument.CommentPayload>(result);
+      const resultData = await this._updateComment(id, input);
+      return createSuccessResult<CommentPayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.CommentPayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeUpdateComment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.CommentPayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<CommentPayload>(error); }
+      const linearError = new LinearError(`Error in safeUpdateComment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<CommentPayload>(linearError);
     }
-  },
-  
-  /**
-   * Delete a comment
-   * 
-   * @param id The comment ID to delete
-   * @returns DeletePayload indicating the success of the operation
-   * @throws {LinearError} With VALIDATION type if ID format is invalid
-   * @throws {LinearError} With NOT_FOUND type if comment doesn't exist
-   * @throws {LinearError} With various types for API errors
-   */
-  async _deleteComment(id: string): Promise<LinearDocument.DeletePayload> {
+  }
+
+  private async _deleteComment(id: string): Promise<DeletePayload> {
     try {
-      // 1. Validate the comment ID
       validateLinearId(id, LinearEntityType.COMMENT);
-      
-      // 2. Define GraphQL mutation
       const mutation = `
         mutation DeleteComment($id: String!) {
-          commentDelete(id: $id) {
-            success
-            entityId
-            lastSyncId
-          }
+          commentDelete(id: $id) { success entityId lastSyncId }
         }
       `;
-      
-      // 3. Execute mutation with variables
       const variables = { id };
-      const response = await this.executeGraphQLMutation<{ commentDelete: LinearDocument.DeletePayload }>(mutation, variables);
-      
-      // 4. Validate response
-      if (!response.data || !response.data.commentDelete) {
-        throw new LinearError(
-          `Failed to delete comment with ID ${id}`,
-          LinearErrorType.UNKNOWN
-        );
+      // Note: Original used executeGraphQLMutation directly
+      const result = await this.safeExecuteGraphQLMutation<{ commentDelete: DeletePayload }>(mutation, variables);
+       if (!result.success || !result.data?.commentDelete) {
+        throw new LinearError(result.error?.message || `Failed to delete comment with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // 5. Return typed data
-      return response.data.commentDelete;
+      return result.data.commentDelete;
     } catch (error) {
-      // 6. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 7. Convert other errors to LinearError
-      throw new LinearError(
-        `Error deleting comment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error deleting comment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Delete a comment with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `deleteComment()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the success payload
-   * or error information.
-   *
-   * @param id The comment ID to delete
-   * @returns LinearResult containing either:
-   *          - success: true with deletion confirmation for valid requests
-   *          - success: false with error information for invalid inputs, not found comments, or API errors
-   */
-  async safeDeleteComment(id: string): Promise<LinearResult<LinearDocument.DeletePayload>> {
+  }
+  public async safeDeleteComment(id: string): Promise<LinearResult<DeletePayload>> {
     try {
-      const result = await this._deleteComment(id);
-      return createSuccessResult<LinearDocument.DeletePayload>(result);
+      const resultData = await this._deleteComment(id);
+      return createSuccessResult<DeletePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.DeletePayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeDeleteComment: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.DeletePayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<DeletePayload>(error); }
+      const linearError = new LinearError(`Error in safeDeleteComment: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<DeletePayload>(linearError);
     }
-  },
-  
-  /**
-   * Create a new issue label
-   * 
-   * @param input The issue label creation input containing required fields
-   * @returns The created issue label payload containing the label object and success flag
-   * @throws {LinearError} With VALIDATION type if required fields are missing
-   * @throws {LinearError} With various types for API errors
-   */
-  async _createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearDocument.IssueLabelPayload> {
+  }
+
+  private async _createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<IssueLabelPayload> {
     try {
-      // 1. Validate required parameters
-      if (!input.name) {
-        throw new LinearError(
-          'Label name is required',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      if (!input.color) {
-        throw new LinearError(
-          'Label color is required',
-          LinearErrorType.VALIDATION
-        );
-      }
-      
-      // 2. Validate teamId if provided
-      if (input.teamId) {
-        validateLinearId(input.teamId, LinearEntityType.TEAM);
-      }
-      
-      // 3. Define GraphQL mutation with all required fields
+      if (!input.name) { throw new LinearError('Label name is required', LinearErrorType.InvalidInput); }
+      if (!input.color) { throw new LinearError('Label color is required', LinearErrorType.InvalidInput); }
+      if (input.teamId) { validateLinearId(input.teamId, LinearEntityType.TEAM); }
       const mutation = `
         mutation CreateIssueLabel($input: IssueLabelCreateInput!) {
           issueLabelCreate(input: $input) {
             success
-            issueLabel {
-              id
-              name
-              color
-              description
-              isGroup
-              createdAt
-              updatedAt
-              team {
-                id
-                name
-                key
-              }
-              parent {
-                id
-                name
-              }
-            }
+            issueLabel { id name color description isGroup createdAt updatedAt team { id name key } parent { id name } }
             lastSyncId
           }
         }
       `;
-      
-      // 4. Execute mutation with variables
       const variables = { input };
-      const response = await this.executeGraphQLMutation<{ issueLabelCreate: LinearDocument.IssueLabelPayload }>(mutation, variables);
-      
-      // 5. Validate response
-      if (!response.data || !response.data.issueLabelCreate) {
-        throw new LinearError(
-          'Failed to create issue label',
-          LinearErrorType.UNKNOWN
-        );
+      const result = await this.safeExecuteGraphQLMutation<{ issueLabelCreate: IssueLabelPayload }>(mutation, variables);
+      if (!result.success || !result.data?.issueLabelCreate) {
+        throw new LinearError(result.error?.message || 'Failed to create issue label', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // 6. Return typed data
-      return response.data.issueLabelCreate;
+      return result.data.issueLabelCreate;
     } catch (error) {
-      // 7. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 8. Convert other errors to LinearError
-      throw new LinearError(
-        `Error creating issue label: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error creating issue label: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Create a new issue label with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `createIssueLabel()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully created
-   * issue label payload or error information.
-   *
-   * @param input The issue label creation input
-   * @returns LinearResult containing either:
-   *          - success: true with issue label payload for valid requests
-   *          - success: false with error information for invalid inputs or API errors
-   */
-  async safeCreateIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearResult<LinearDocument.IssueLabelPayload>> {
+  }
+  public async safeCreateIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<LinearResult<IssueLabelPayload>> {
     try {
-      const result = await this._createIssueLabel(input);
-      return createSuccessResult<LinearDocument.IssueLabelPayload>(result);
+      const resultData = await this._createIssueLabel(input);
+      return createSuccessResult<IssueLabelPayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.IssueLabelPayload>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeCreateIssueLabel: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.IssueLabelPayload>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<IssueLabelPayload>(error); }
+      const linearError = new LinearError(`Error in safeCreateIssueLabel: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<IssueLabelPayload>(linearError);
     }
-  },
-  
-  /**
-   * Fetch all teams with optional filtering
-   * 
-   * @param filter Optional filter to apply to teams query
-   * @param first Maximum number of teams to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @param includeArchived Whether to include archived teams (default: false)
-   * @returns TeamConnection containing nodes and pagination info
-   * @throws {LinearError} With various types for API errors
-   */
-  async _teams(
-    filter?: LinearDocument.TeamFilter, 
-    first: number = 50, 
-    after?: string,
-    includeArchived: boolean = false
-  ): Promise<LinearDocument.TeamConnection> {
+  }
+
+  private async _teams(filter?: LinearDocument.TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<TeamConnection> {
     try {
-      // Define GraphQL query with all required fields
       const query = `
         query Teams($filter: TeamFilter, $first: Int, $after: String, $includeArchived: Boolean) {
           teams(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived) {
-            nodes {
-              id
-              name
-              key
-              description
-              color
-              icon
-              private
-              createdAt
-              updatedAt
-              states {
-                nodes {
-                  id
-                  name
-                  color
-                  type
-                }
-              }
-              labels {
-                nodes {
-                  id
-                  name
-                  color
-                }
-              }
-              members {
-                nodes {
-                  id
-                  name
-                  displayName
-                  email
-                }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              hasPreviousPage
-              startCursor
-              endCursor
-            }
+            nodes { id name key description color icon private createdAt updatedAt states { nodes { id name color type } } labels { nodes { id name color } } members { nodes { id name displayName email } } }
+            pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
           }
         }
       `;
-      
-      // Execute query with variables
       const variables = { filter, first, after, includeArchived };
-      const response = await this.executeGraphQLQuery<{ teams: LinearDocument.TeamConnection }>(query, variables);
-      
-      // Validate response
-      if (!response.data || !response.data.teams) {
-        throw new LinearError(
-          'Failed to fetch teams',
-          LinearErrorType.UNKNOWN
-        );
+      const result = await this.safeExecuteGraphQLQuery<{ teams: TeamConnection }>(query, variables);
+      if (!result.success || !result.data?.teams) {
+        throw new LinearError(result.error?.message || 'Failed to fetch teams', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // Return typed data
-      return response.data.teams;
+      return result.data.teams;
     } catch (error) {
-      // Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching teams: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching teams: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Fetch all teams with optional filtering and error handling using Result pattern
-   * 
-   * This method is a non-throwing variant of the `teams()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully retrieved
-   * teams or error information.
-   *
-   * @param filter Optional filter to apply to teams query
-   * @param first Maximum number of teams to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @param includeArchived Whether to include archived teams (default: false)
-   * @returns LinearResult containing either teams data or error information
-   */
-  async safeTeams(
-    filter?: LinearDocument.TeamFilter, 
-    first: number = 50, 
-    after?: string,
-    includeArchived: boolean = false
-  ): Promise<LinearResult<LinearDocument.TeamConnection>> {
+  }
+  public async safeTeams(filter?: LinearDocument.TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<LinearResult<TeamConnection>> {
     try {
-      const result = await this._teams(filter, first, after, includeArchived);
-      return createSuccessResult<LinearDocument.TeamConnection>(result);
+      const resultData = await this._teams(filter, first, after, includeArchived);
+      return createSuccessResult<TeamConnection>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.TeamConnection>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeTeams: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.TeamConnection>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<TeamConnection>(error); }
+      const linearError = new LinearError(`Error in safeTeams: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<TeamConnection>(linearError);
     }
-  },
-  
-  /**
-   * Get a team by ID
-   * 
-   * @param id The team ID to retrieve
-   * @returns The team object with all its properties
-   * @throws {LinearError} With NOT_FOUND type if team doesn't exist
-   * @throws {LinearError} With VALIDATION type if ID format is invalid
-   */
-  async _team(id: string): Promise<LinearDocument.Team> {
+  }
+
+  private async _team(id: string): Promise<Team> {
     try {
-      // 1. Validate parameters
       validateLinearId(id, LinearEntityType.TEAM);
-      
-      // 2. Define GraphQL query with all required fields
       const query = `
         query GetTeam($teamId: String!) {
           team(id: $teamId) {
@@ -1527,103 +723,36 @@ const enhancedClient = {
             private
             createdAt
             updatedAt
-            states {
-              nodes {
-                id
-                name
-                color
-                type
-              }
-            }
-            labels {
-              nodes {
-                id
-                name
-                color
-              }
-            }
-            members {
-              nodes {
-                id
-                name
-                displayName
-                email
-              }
-            }
+            states { nodes { id name color type } }
+            labels { nodes { id name color } }
+            members { nodes { id name displayName email } }
           }
         }
       `;
-      
-      // 3. Execute query with variables
       const variables = { teamId: id };
-      const response = await this.executeGraphQLQuery<{ team: LinearDocument.Team }>(query, variables);
-      
-      // 4. Validate response
-      if (!response.data || !response.data.team) {
-        throw new LinearError(
-          `Team with ID ${id} not found`,
-          LinearErrorType.NOT_FOUND
-        );
+      const result = await this.safeExecuteGraphQLQuery<{ team: Team }>(query, variables);
+      if (!result.success || !result.data?.team) {
+        throw new LinearError(result.error?.message || `Team with ID ${id} not found`, result.error?.type || LinearErrorType.FeatureNotAccessible, result.error?.originalError);
       }
-      
-      // 5. Return typed data
-      return response.data.team;
+      return result.data.team;
     } catch (error) {
-      // 6. Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // 7. Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching team: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching team: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Get a team by ID with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `team()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully retrieved
-   * team or error information.
-   *
-   * @param id The team ID to retrieve
-   * @returns LinearResult containing either:
-   *          - success: true with team data for valid requests
-   *          - success: false with error information for invalid inputs or not found teams
-   */
-  async safeTeam(id: string): Promise<LinearResult<LinearDocument.Team>> {
+  }
+  public async safeTeam(id: string): Promise<LinearResult<Team>> {
     try {
       const team = await this._team(id);
-      return createSuccessResult<LinearDocument.Team>(team);
+      return createSuccessResult<Team>(team);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.Team>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeTeam: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.Team>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<Team>(error); }
+      const linearError = new LinearError(`Error in safeTeam: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<Team>(linearError);
     }
-  },
-  
-  /**
-   * Get the current authenticated user's profile
-   * 
-   * @returns The user object with all its properties
-   * @throws {LinearError} With AUTHENTICATION type if the user is not authenticated
-   * @throws {LinearError} With various types for API errors
-   */
-  async _getViewer(): Promise<LinearDocument.User> {
+  }
+
+  private async _getViewer(): Promise<User> {
     try {
-      // Define GraphQL query with all required fields
       const query = `
         query Viewer {
           viewer {
@@ -1638,103 +767,36 @@ const enhancedClient = {
             updatedAt
             lastSeen
             organizationId
-            organization {
-              id
-              name
-              urlKey
-            }
-            teams {
-              nodes {
-                id
-                name
-                key
-              }
-            }
+            organization { id name urlKey }
+            teams { nodes { id name key } }
           }
         }
       `;
-      
-      // Execute query
-      const result = await this.safeExecuteGraphQLQuery<{ viewer: LinearDocument.User }>(query);
-      
-      // Validate response
+      const result = await this.safeExecuteGraphQLQuery<{ viewer: User }>(query);
       if (!result.success || !result.data?.viewer) {
-        throw new LinearError(
-          result.error?.message || 'Failed to fetch viewer profile',
-          result.error?.type || LinearErrorType.AUTHENTICATION,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || 'Failed to fetch viewer profile', result.error?.type || LinearErrorType.AuthenticationError, result.error?.originalError);
       }
-      
-      // Return typed data
       return result.data.viewer;
     } catch (error) {
-      // Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching viewer profile: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching viewer profile: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.AuthenticationError, error);
     }
-  },
-  
-  /**
-   * Get the current authenticated user's profile with error handling using the Result pattern
-   * 
-   * This method is a non-throwing variant of the `getViewer()` method. Instead of throwing
-   * exceptions, it returns a Result object that contains either the successfully retrieved
-   * user or error information.
-   *
-   * @returns LinearResult containing either:
-   *          - success: true with user data for valid requests
-   *          - success: false with error information for authentication or API errors
-   */
-  async safeGetViewer(): Promise<LinearResult<LinearDocument.User>> {
+  }
+  public async safeGetViewer(): Promise<LinearResult<User>> {
     try {
       const user = await this._getViewer();
-      return createSuccessResult<LinearDocument.User>(user);
+      return createSuccessResult<User>(user);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.User>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeGetViewer: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<LinearDocument.User>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<User>(error); }
+      const linearError = new LinearError(`Error in safeGetViewer: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.AuthenticationError, error);
+      return createErrorResult<User>(linearError);
     }
-  },
-
-  /**
-   * Fetches a specific cycle by ID
-   * 
-   * @param id The ID of the cycle to fetch
-   * @returns The cycle data
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _cycle(id: string): Promise<LinearDocument.Cycle> {
-    // Validate cycle ID
-    if (!id || id.trim() === '') {
-      throw new LinearError(
-        'Cycle ID cannot be empty',
-        LinearErrorType.VALIDATION,
-        undefined
-      );
-    }
-    
+  }
+  
+  private async _cycle(id: string): Promise<Cycle> {
+    if (!id || id.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
-      // Validate ID format
       validateLinearId(id, LinearEntityType.CYCLE);
-      
-      // Define the GraphQL query for fetching a cycle by ID
       const query = `
         query GetCycle($id: ID!) {
           cycle(id: $id) {
@@ -1760,571 +822,204 @@ const enhancedClient = {
           }
         }
       `;
-      
-      // Execute the query with the cycle ID
-      const response = await this.executeGraphQLQuery<{ cycle: LinearDocument.Cycle }>(query, { id });
-      
-      // Check if cycle was found
-      if (!response.data || !response.data.cycle) {
-        throw new LinearError(
-          `Cycle with ID ${id} not found`,
-          LinearErrorType.NOT_FOUND,
-          undefined
-        );
+      const result = await this.safeExecuteGraphQLQuery<{ cycle: Cycle }>(query, { id });
+      if (!result.success || !result.data?.cycle) {
+        throw new LinearError(result.error?.message || `Cycle with ID ${id} not found`, result.error?.type || LinearErrorType.FeatureNotAccessible, result.error?.originalError);
       }
-      
-      return response.data.cycle;
+      return result.data.cycle;
     } catch (error) {
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError format
-      throw new LinearError(
-        `Failed to fetch cycle with ID ${id}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Failed to fetch cycle with ID ${id}`, LinearErrorType.Unknown, error);
     }
-  },
-
-  /**
-   * Safely fetches a specific cycle by ID with error handling
-   * 
-   * @param id The ID of the cycle to fetch
-   * @returns LinearResult containing cycle data or error information
-   */
-  async safeCycle(id: string): Promise<LinearResult<LinearDocument.Cycle>> {
+  }
+  public async safeCycle(id: string): Promise<LinearResult<Cycle>> {
     try {
       const cycle = await this._cycle(id);
-      return createSuccessResult<LinearDocument.Cycle>(cycle);
+      return createSuccessResult<Cycle>(cycle);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.Cycle>(error);
-      }
-      return createErrorResult<LinearDocument.Cycle>(
-        new LinearError('Failed to fetch cycle', LinearErrorType.UNKNOWN, error)
-      );
+      if (error instanceof LinearError) { return createErrorResult<Cycle>(error); }
+      return createErrorResult<Cycle>(new LinearError('Failed to fetch cycle', LinearErrorType.Unknown, error));
     }
-  },
+  }
 
-  /**
-   * Fetches cycles with optional filtering
-   * 
-   * @param filter Optional filter criteria for cycles
-   * @param first Number of cycles to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @param includeArchived Whether to include archived cycles (default: false)
-   * @returns Connection object with cycle nodes
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _cycles(
-    filter?: LinearDocument.CycleFilter, 
-    first: number = 50, 
-    after?: string,
-    includeArchived: boolean = false
-  ): Promise<LinearDocument.CycleConnection> {
+  private async _cycles(filter?: LinearDocument.CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<CycleConnection> {
     try {
-      // Define the GraphQL query for fetching cycles
       const query = `
         query GetCycles($filter: CycleFilter, $first: Int, $after: String, $includeArchived: Boolean) {
           cycles(filter: $filter, first: $first, after: $after, includeArchived: $includeArchived) {
-            nodes {
-              id
-              name
-              number
-              startsAt
-              endsAt
-              completedAt
-              description
-              team {
-                id
-                name
-                key
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
+            nodes { id name number startsAt endsAt completedAt description team { id name key } }
+            pageInfo { hasNextPage endCursor }
           }
         }
       `;
-      
-      // Execute the query with filter parameters
-      const response = await this.executeGraphQLQuery<{ cycles: LinearDocument.CycleConnection }>(
-        query, 
-        { filter, first, after, includeArchived }
-      );
-      
-      // Check if cycles data exists
-      if (!response.data || !response.data.cycles) {
-        throw new LinearError(
-          'Failed to fetch cycles',
-          LinearErrorType.UNKNOWN,
-          undefined
-        );
+      const result = await this.safeExecuteGraphQLQuery<{ cycles: CycleConnection }>(query, { filter, first, after, includeArchived });
+      if (!result.success || !result.data?.cycles) {
+        throw new LinearError(result.error?.message || 'Failed to fetch cycles', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      return response.data.cycles;
+      return result.data.cycles;
     } catch (error) {
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError format
-      throw new LinearError(
-        'Failed to fetch cycles',
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError('Failed to fetch cycles', LinearErrorType.Unknown, error);
     }
-  },
-
-  /**
-   * Safely fetches cycles with optional filtering
-   * 
-   * @param filter Optional filter criteria for cycles
-   * @param first Number of cycles to fetch (default: 50)
-   * @param after Cursor for pagination
-   * @param includeArchived Whether to include archived cycles (default: false)
-   * @returns LinearResult containing cycles data or error information
-   */
-  async safeCycles(
-    filter?: LinearDocument.CycleFilter, 
-    first: number = 50, 
-    after?: string,
-    includeArchived: boolean = false
-  ): Promise<LinearResult<LinearDocument.CycleConnection>> {
+  }
+  public async safeCycles(filter?: LinearDocument.CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<LinearResult<CycleConnection>> {
     try {
       const cycles = await this._cycles(filter, first, after, includeArchived);
-      return createSuccessResult<LinearDocument.CycleConnection>(cycles);
+      return createSuccessResult<CycleConnection>(cycles);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.CycleConnection>(error);
-      }
-      return createErrorResult<LinearDocument.CycleConnection>(
-        new LinearError('Failed to fetch cycles', LinearErrorType.UNKNOWN, error)
-      );
+      if (error instanceof LinearError) { return createErrorResult<CycleConnection>(error); }
+      return createErrorResult<CycleConnection>(new LinearError('Failed to fetch cycles', LinearErrorType.Unknown, error));
     }
-  },
+  }
 
-  /**
-   * Creates a new cycle
-   * 
-   * @param input Cycle creation parameters
-   * @returns CyclePayload containing the created cycle
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _createCycle(input: LinearDocument.CycleCreateInput): Promise<LinearDocument.CyclePayload> {
-    // Validate required inputs
-    if (!input.teamId) {
-      throw new LinearError(
-        'Team ID is required to create a cycle',
-        LinearErrorType.VALIDATION,
-        undefined
-      );
-    }
-    
+  private async _createCycle(input: LinearDocument.CycleCreateInput): Promise<CyclePayload> {
+    if (!input.teamId) { throw new LinearError('Team ID is required to create a cycle', LinearErrorType.InvalidInput); }
     try {
-      // Validate ID format
-      if (input.teamId) {
-        validateLinearId(input.teamId, LinearEntityType.TEAM);
-      }
-      
-      // Define the GraphQL mutation for creating a cycle
+      if (input.teamId) { validateLinearId(input.teamId, LinearEntityType.TEAM); }
       const mutation = `
         mutation CreateCycle($input: CycleCreateInput!) {
           cycleCreate(input: $input) {
             success
-            cycle {
-              id
-              name
-              number
-              startsAt
-              endsAt
-              completedAt
-              description
-              team {
-                id
-                name
-                key
-              }
-            }
+            cycle { id name number startsAt endsAt completedAt description team { id name key } }
           }
         }
       `;
-      
-      // Execute the mutation with the input data
-      const response = await this.executeGraphQLMutation<{ cycleCreate: LinearDocument.CyclePayload }>(
-        mutation, 
-        { input }
-      );
-      
-      // Check if cycle creation was successful
-      if (!response.data || !response.data.cycleCreate) {
-        throw new LinearError(
-          'Failed to create cycle',
-          LinearErrorType.UNKNOWN,
-          undefined
-        );
+      const result = await this.safeExecuteGraphQLMutation<{ cycleCreate: CyclePayload }>(mutation, { input });
+      if (!result.success || !result.data?.cycleCreate) {
+        throw new LinearError(result.error?.message || 'Failed to create cycle', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      return response.data.cycleCreate;
+      return result.data.cycleCreate;
     } catch (error) {
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError format
-      throw new LinearError(
-        'Failed to create cycle',
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError('Failed to create cycle', LinearErrorType.Unknown, error);
     }
-  },
-
-  /**
-   * Safely creates a new cycle with error handling
-   * 
-   * @param input Cycle creation parameters
-   * @returns LinearResult containing the created cycle or error information
-   */
-  async safeCreateCycle(input: LinearDocument.CycleCreateInput): Promise<LinearResult<LinearDocument.CyclePayload>> {
+  }
+  public async safeCreateCycle(input: LinearDocument.CycleCreateInput): Promise<LinearResult<CyclePayload>> {
     try {
-      const result = await this._createCycle(input);
-      return createSuccessResult<LinearDocument.CyclePayload>(result);
+      const resultData = await this._createCycle(input);
+      return createSuccessResult<CyclePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.CyclePayload>(error);
-      }
-      return createErrorResult<LinearDocument.CyclePayload>(
-        new LinearError('Failed to create cycle', LinearErrorType.UNKNOWN, error)
-      );
+      if (error instanceof LinearError) { return createErrorResult<CyclePayload>(error); }
+      return createErrorResult<CyclePayload>(new LinearError('Failed to create cycle', LinearErrorType.Unknown, error));
     }
-  },
+  }
 
-  /**
-   * Updates an existing cycle
-   * 
-   * @param id ID of the cycle to update
-   * @param input Cycle update parameters
-   * @returns CyclePayload containing the updated cycle
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearDocument.CyclePayload> {
-    // Validate cycle ID
-    if (!id || id.trim() === '') {
-      throw new LinearError(
-        'Cycle ID cannot be empty',
-        LinearErrorType.VALIDATION,
-        undefined
-      );
-    }
-    
+  private async _updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<CyclePayload> {
+    if (!id || id.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
-      // Validate ID format
       validateLinearId(id, LinearEntityType.CYCLE);
-      
-      // Define the GraphQL mutation for updating a cycle
       const mutation = `
         mutation UpdateCycle($id: ID!, $input: CycleUpdateInput!) {
           cycleUpdate(id: $id, input: $input) {
             success
-            cycle {
-              id
-              name
-              number
-              startsAt
-              endsAt
-              completedAt
-              description
-              team {
-                id
-                name
-                key
-              }
-            }
+            cycle { id name number startsAt endsAt completedAt description team { id name key } }
           }
         }
       `;
-      
-      // Execute the mutation with cycle ID and input data
-      const response = await this.executeGraphQLMutation<{ cycleUpdate: LinearDocument.CyclePayload }>(
-        mutation, 
-        { id, input }
-      );
-      
-      // Check if cycle update was successful
-      if (!response.data || !response.data.cycleUpdate) {
-        throw new LinearError(
-          `Failed to update cycle with ID ${id}`,
-          LinearErrorType.UNKNOWN,
-          undefined
-        );
+      const result = await this.safeExecuteGraphQLMutation<{ cycleUpdate: CyclePayload }>(mutation, { id, input });
+      if (!result.success || !result.data?.cycleUpdate) {
+        throw new LinearError(result.error?.message || `Failed to update cycle with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      return response.data.cycleUpdate;
+      return result.data.cycleUpdate;
     } catch (error) {
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError format
-      throw new LinearError(
-        `Failed to update cycle with ID ${id}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Failed to update cycle with ID ${id}`, LinearErrorType.Unknown, error);
     }
-  },
-
-  /**
-   * Safely updates an existing cycle with error handling
-   * 
-   * @param id ID of the cycle to update
-   * @param input Cycle update parameters
-   * @returns LinearResult containing the updated cycle or error information
-   */
-  async safeUpdateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearResult<LinearDocument.CyclePayload>> {
+  }
+  public async safeUpdateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<LinearResult<CyclePayload>> {
     try {
-      const result = await this._updateCycle(id, input);
-      return createSuccessResult<LinearDocument.CyclePayload>(result);
+      const resultData = await this._updateCycle(id, input);
+      return createSuccessResult<CyclePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.CyclePayload>(error);
-      }
-      return createErrorResult<LinearDocument.CyclePayload>(
-        new LinearError(`Failed to update cycle with ID ${id}`, LinearErrorType.UNKNOWN, error)
-      );
+      if (error instanceof LinearError) { return createErrorResult<CyclePayload>(error); }
+      return createErrorResult<CyclePayload>(new LinearError(`Failed to update cycle with ID ${id}`, LinearErrorType.Unknown, error));
     }
-  },
+  }
 
-  /**
-   * Adds an issue to a cycle
-   * 
-   * @param issueId ID of the issue to add
-   * @param cycleId ID of the cycle to add the issue to
-   * @returns IssuePayload containing the updated issue
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _addIssueToCycle(issueId: string, cycleId: string): Promise<LinearDocument.IssuePayload> {
-    // Validate IDs
-    if (!issueId || issueId.trim() === '') {
-      throw new LinearError(
-        'Issue ID cannot be empty',
-        LinearErrorType.VALIDATION,
-        undefined
-      );
-    }
-    
-    if (!cycleId || cycleId.trim() === '') {
-      throw new LinearError(
-        'Cycle ID cannot be empty',
-        LinearErrorType.VALIDATION,
-        undefined
-      );
-    }
-    
+  private async _addIssueToCycle(issueId: string, cycleId: string): Promise<IssuePayload> {
+    if (!issueId || issueId.trim() === '') { throw new LinearError('Issue ID cannot be empty', LinearErrorType.InvalidInput); }
+    if (!cycleId || cycleId.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
-      // Validate ID formats
       validateLinearId(issueId, LinearEntityType.ISSUE);
       validateLinearId(cycleId, LinearEntityType.CYCLE);
-      
-      // Define the GraphQL mutation for adding an issue to a cycle
       const mutation = `
         mutation AddIssueToCycle($issueId: ID!, $cycleId: ID!) {
           issueUpdate(id: $issueId, input: { cycleId: $cycleId }) {
             success
-            issue {
-              id
-              identifier
-              title
-              cycle {
-                id
-                name
-                number
-                startsAt
-                endsAt
-              }
-            }
+            issue { id identifier title cycle { id name number startsAt endsAt } }
           }
         }
       `;
-      
-      // Execute the mutation with issue ID and cycle ID
-      const response = await this.executeGraphQLMutation<{ issueUpdate: LinearDocument.IssuePayload }>(
-        mutation, 
-        { issueId, cycleId }
-      );
-      
-      // Check if update was successful
-      if (!response.data || !response.data.issueUpdate) {
-        throw new LinearError(
-          'Failed to add issue to cycle',
-          LinearErrorType.UNKNOWN,
-          undefined
-        );
+      const result = await this.safeExecuteGraphQLMutation<{ issueUpdate: IssuePayload }>(mutation, { issueId, cycleId });
+      if (!result.success || !result.data?.issueUpdate) {
+        throw new LinearError(result.error?.message || 'Failed to add issue to cycle', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      return response.data.issueUpdate;
+      return result.data.issueUpdate;
     } catch (error) {
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError format
-      throw new LinearError(
-        'Failed to add issue to cycle',
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError('Failed to add issue to cycle', LinearErrorType.Unknown, error);
     }
-  },
-
-  /**
-   * Safely adds an issue to a cycle with error handling
-   * 
-   * @param issueId ID of the issue to add
-   * @param cycleId ID of the cycle to add the issue to
-   * @returns LinearResult containing the updated issue or error information
-   */
-  async safeAddIssueToCycle(issueId: string, cycleId: string): Promise<LinearResult<LinearDocument.IssuePayload>> {
+  }
+  public async safeAddIssueToCycle(issueId: string, cycleId: string): Promise<LinearResult<IssuePayload>> {
     try {
-      const result = await this._addIssueToCycle(issueId, cycleId);
-      return createSuccessResult<LinearDocument.IssuePayload>(result);
+      const resultData = await this._addIssueToCycle(issueId, cycleId);
+      return createSuccessResult<IssuePayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<LinearDocument.IssuePayload>(error);
-      }
-      return createErrorResult<LinearDocument.IssuePayload>(
-        new LinearError('Failed to add issue to cycle', LinearErrorType.UNKNOWN, error)
-      );
+      if (error instanceof LinearError) { return createErrorResult<IssuePayload>(error); }
+      return createErrorResult<IssuePayload>(new LinearError('Failed to add issue to cycle', LinearErrorType.Unknown, error));
     }
-  },
+  }
 
-  /**
-   * Test authentication with Linear API
-   * This function performs a simple GraphQL query to verify the API key is valid
-   * @returns Result indicating success or failure with detailed error information
-   */
-  async testAuthentication(): Promise<LinearResult<Record<string, unknown>>> {
+  public async testAuthentication(): Promise<LinearResult<Record<string, unknown>>> {
     try {
-      // Simple GraphQL query to verify auth
       const query = `query { viewer { email } }`;
       const result = await this.safeExecuteGraphQLQuery<Record<string, unknown>>(query);
-      
       return result;
     } catch (error) {
-      // This is a fallback in case safeExecuteGraphQLQuery throws (it shouldn't)
-      if (error instanceof LinearError) {
-        return createErrorResult<Record<string, unknown>>(error);
-      }
-      
-      const linearError = new LinearError(
-        error instanceof Error ? error.message : 'Unknown authentication error',
-        LinearErrorType.AUTHENTICATION,
-        error
-      );
-      
+      if (error instanceof LinearError) { return createErrorResult<Record<string, unknown>>(error); }
+      const linearError = new LinearError(error instanceof Error ? error.message : 'Unknown authentication error', LinearErrorType.AuthenticationError, error);
       return createErrorResult<Record<string, unknown>>(linearError);
     }
-  },
+  }
 
-  /**
-   * Fetch comments for a specific issue
-   * 
-   * @param issueId The ID of the issue to fetch comments for
-   * @returns Connection object with comment nodes
-   * @throws {LinearError} Standardized error for API or validation failures
-   */
-  async _getIssueComments(issueId: string): Promise<{ nodes: Array<LinearDocument.Comment> }> {
+  private async _getIssueComments(issueId: string): Promise<{ nodes: Array<Comment> }> {
     try {
-      // Validate parameters
       validateLinearId(issueId, LinearEntityType.ISSUE);
-      
-      // Define GraphQL query with all required fields
       const query = `
         query GetIssueComments($issueId: String!) {
           issue(id: $issueId) {
             comments {
-              nodes {
-                id
-                body
-                createdAt
-                updatedAt
-                editedAt
-                user {
-                  id
-                  name
-                  email
-                }
-              }
+              nodes { id body createdAt updatedAt editedAt user { id name email } }
             }
           }
         }
       `;
-      
-      // Execute query with variables
       const variables = { issueId };
-      const result = await this.safeExecuteGraphQLQuery<{ issue: { comments: { nodes: Array<LinearDocument.Comment> } } }>(query, variables);
-      
-      // Validate response
+      const result = await this.safeExecuteGraphQLQuery<{ issue: { comments: { nodes: Array<Comment> } } }>(query, variables);
       if (!result.success || !result.data?.issue?.comments) {
-        throw new LinearError(
-          result.error?.message || `Failed to fetch comments for issue with ID ${issueId}`,
-          result.error?.type || LinearErrorType.UNKNOWN,
-          result.error?.originalError
-        );
+        throw new LinearError(result.error?.message || `Failed to fetch comments for issue with ID ${issueId}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      
-      // Return just the comments object
       return result.data.issue.comments;
     } catch (error) {
-      // Handle errors
-      if (error instanceof LinearError) {
-        throw error;
-      }
-      
-      // Convert other errors to LinearError
-      throw new LinearError(
-        `Error fetching comments for issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
+      if (error instanceof LinearError) { throw error; }
+      throw new LinearError(`Error fetching comments for issue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
-  },
-  
-  /**
-   * Fetch comments for a specific issue with error handling using the Result pattern
-   * 
-   * @param issueId The ID of the issue to fetch comments for
-   * @returns LinearResult containing either comments data or error information
-   */
-  async safeGetIssueComments(issueId: string): Promise<LinearResult<{ nodes: Array<LinearDocument.Comment> }>> {
+  }
+  public async safeGetIssueComments(issueId: string): Promise<LinearResult<{ nodes: Array<Comment> }>> {
     try {
       const comments = await this._getIssueComments(issueId);
-      return createSuccessResult<{ nodes: Array<LinearDocument.Comment> }>(comments);
+      return createSuccessResult<{ nodes: Array<Comment> }>(comments);
     } catch (error) {
-      if (error instanceof LinearError) {
-        return createErrorResult<{ nodes: Array<LinearDocument.Comment> }>(error);
-      }
-      
-      const linearError = new LinearError(
-        `Error in safeGetIssueComments: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
-        error
-      );
-      
-      return createErrorResult<{ nodes: Array<LinearDocument.Comment> }>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<{ nodes: Array<Comment> }>(error); }
+      const linearError = new LinearError(`Error in safeGetIssueComments: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<{ nodes: Array<Comment> }>(linearError);
     }
-  },
-};
+  }
+}
 
-// Export enhancedClient both as named and default export
-// Note: There are some TypeScript incompatibilities between our types and the SDK types
-// We're using 'any' casts in places to bridge these gaps, but GraphQL operations
-// provide better type safety through our safeExecuteGraphQL methods
-export { enhancedClient };
-export default enhancedClient;
+const enhancedClientInstance = new EnhancedLinearClient();
+
+export { enhancedClientInstance as enhancedClient };
+export default enhancedClientInstance;
+
+

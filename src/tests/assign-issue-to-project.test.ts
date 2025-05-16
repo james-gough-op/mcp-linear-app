@@ -1,13 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearResult } from '../libs/errors.js';
 import { LinearAssignIssueToProjectTool } from '../tools/linear/assign-issue-to-project.js';
 
 // Mock Linear API responses
 vi.mock('../libs/client.js', () => {
   return {
-    default: {},
-    enhancedClient: {
+    default: {
       executeGraphQLMutation: vi.fn()
     }
   };
@@ -64,7 +62,7 @@ describe('LinearAssignIssueToProjectTool', () => {
     };
     
     // Set up the mock to return our test data
-    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(mockResponse as LinearResult<unknown>);
+    vi.mocked(enhancedClient.executeGraphQLMutation).mockResolvedValueOnce(mockResponse);
     
     // Call the handler with valid parameters
     const response = await LinearAssignIssueToProjectTool.handler({
@@ -73,7 +71,7 @@ describe('LinearAssignIssueToProjectTool', () => {
     }, { signal: new AbortController().signal });
     
     // Verify the mutation was called with correct parameters
-    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
+    expect(enhancedClient.executeGraphQLMutation).toHaveBeenCalledWith(
       expect.stringContaining('mutation AssignIssueToProject'),
       {
         issueId: MOCK_ISSUE_ID,
@@ -99,7 +97,7 @@ describe('LinearAssignIssueToProjectTool', () => {
     };
     
     // Set up the mock to return our failed response
-    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(mockResponse as LinearResult<unknown>);
+    vi.mocked(enhancedClient.executeGraphQLMutation).mockResolvedValueOnce(mockResponse);
     
     // Call the handler with valid parameters
     const response = await LinearAssignIssueToProjectTool.handler({

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { Comment } from '../../generated/linear-types.js';
+
+import { Comment } from "@linear/sdk";
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
@@ -54,7 +55,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       // Handle delete operation if delete flag is true
       if (args.delete === true) {
         // Delete the comment
-        const deleteCommentResponse = await enhancedClient._deleteComment(args.commentId);
+        const deleteCommentResponse = await enhancedClient.safeDeleteComment(args.commentId);
         
         if (!deleteCommentResponse) {
           return {
@@ -97,7 +98,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       }
       
       // Update the comment
-      const updateCommentResponse = await enhancedClient._updateComment(args.commentId, {
+      const updateCommentResponse = await enhancedClient.safeUpdateComment(args.commentId, {
         body: args.comment,
       });
       
@@ -114,7 +115,7 @@ export const LinearUpdateCommentTool = createSafeTool({
       // Linear SDK returns results in success and entity pattern
       if (updateCommentResponse.success) {
         // Access comment and get ID with correct data type
-        const comment = await updateCommentResponse.comment;
+        const comment = updateCommentResponse.data?.comment;
         if (comment && comment.id) {
           return {
             content: [{

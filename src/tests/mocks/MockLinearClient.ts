@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+import { LinearResult } from '../../libs/errors.js';
 import { MockLinearResponses } from './linearResponses.js';
 
 /**
@@ -15,6 +17,46 @@ export class MockLinearClient {
   mockResponseFor(operation: string, response: any): void {
     this.mockResponses[operation] = response;
   }
+  
+  /**
+   * Safe version of createIssue that follows the LinearResult pattern
+   * @param args Issue creation arguments
+   * @returns Promise of LinearResult with issue payload
+   */
+  safeCreateIssue = vi.fn().mockImplementation(async (args: any): Promise<LinearResult<any>> => {
+    this.requestLog.push({ operation: 'safeCreateIssue', args });
+    
+    if (this.mockResponses.safeCreateIssue) {
+      return this.mockResponses.safeCreateIssue;
+    }
+    
+    // Default is to return a successful result
+    return {
+      success: true,
+      data: await this.createIssue(args),
+      error: undefined
+    };
+  });
+  
+  /**
+   * Safe version of createIssueLabel that follows the LinearResult pattern
+   * @param args Label creation arguments
+   * @returns Promise of LinearResult with label payload
+   */
+  safeCreateIssueLabel = vi.fn().mockImplementation(async (args: any): Promise<LinearResult<any>> => {
+    this.requestLog.push({ operation: 'safeCreateIssueLabel', args });
+    
+    if (this.mockResponses.safeCreateIssueLabel) {
+      return this.mockResponses.safeCreateIssueLabel;
+    }
+    
+    // Default is to return a successful result
+    return {
+      success: true,
+      data: await this.createLabel(args),
+      error: undefined
+    };
+  });
   
   /**
    * Mock implementation of createLabel
@@ -140,5 +182,6 @@ export class MockLinearClient {
   reset(): void {
     this.mockResponses = {};
     this.requestLog = [];
+    vi.clearAllMocks();
   }
 } 

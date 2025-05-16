@@ -1,10 +1,8 @@
+import { Issue } from "@linear/sdk";
 import { z } from "zod";
-import {
-  Issue
-} from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { formatDate, getPriorityLabel, getStateId, normalizeStateName, safeText } from '../../libs/utils.js';
+import { getStateId, normalizeStateName } from '../../libs/utils.js';
 
 /**
  * Enum for Linear issue priorities as strings for schema
@@ -32,74 +30,6 @@ interface IssueUpdateResponse {
 }
 
 /**
- * Format issue data into human-readable text
- * @param issue Issue data to format
- * @returns Formatted text for human readability
- */
-function formatIssueToHumanReadable(issue: Issue): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-
-  let result = "LINEAR ISSUE UPDATED\n";
-  result += "==================\n\n";
-  
-  // Basic information
-  result += `--- ISSUE DETAILS ---\n`;
-  result += `ID: ${issue.id}\n`;
-  result += `TITLE: ${safeText(issue.title)}\n`;
-  result += `DESCRIPTION: ${safeText(issue.description)}\n\n`;
-  
-  // Status and priority
-  result += `--- STATUS INFO ---\n`;
-  if (issue.state && issue.state.name) {
-    result += `STATUS: ${issue.state.name}\n`;
-  }
-  result += `PRIORITY: ${getPriorityLabel(issue.priority)}\n\n`;
-  
-  // Parent information if exists
-  if (issue.parent && issue.parent.id) {
-    result += `--- PARENT ISSUE ---\n`;
-    result += `PARENT ID: ${issue.parent.id}\n`;
-    if (issue.parent.title) {
-      result += `PARENT TITLE: ${safeText(issue.parent.title)}\n`;
-    }
-    result += `\n`;
-  }
-  
-  // Team information
-  result += `--- TEAM INFO ---\n`;
-  if (issue.team && issue.team.name) {
-    result += `TEAM: ${issue.team.name}\n`;
-  }
-  
-  // Assignee information
-  if (issue.assignee && issue.assignee.name) {
-    result += `ASSIGNEE: ${issue.assignee.name}\n`;
-  }
-  
-  // Dates
-  result += `--- TIME INFO ---\n`;
-  if (issue.createdAt) {
-    result += `CREATED AT: ${formatDate(issue.createdAt)}\n`;
-  }
-  result += `UPDATED AT: ${formatDate(issue.updatedAt)}\n`;
-  
-  // Due date if present
-  if (issue.dueDate) {
-    result += `DUE DATE: ${formatDate(issue.dueDate)}\n`;
-  }
-  
-  // URL
-  result += `\n--- ACCESS INFO ---\n`;
-  result += `URL: ${safeText(issue.url)}\n\n`;
-  
-  result += "The issue has been successfully updated in Linear.";
-  
-  return result;
-}
-
-/**
  * Update issue tool schema definition
  */
 const updateIssueSchema = z.object({
@@ -122,7 +52,7 @@ export const LinearUpdateIssueTool = createSafeTool({
   name: "update_issue",
   description: "A tool that updates an issue in Linear",
   schema: updateIssueSchema.shape,
-  handler: async (args: z.infer<typeof updateIssueSchema>) => {
+  handler: async (args: z.infer<typeof updateIssueSchema>): Promise<{ content: { type: "text"; text: string; }[]; }> => {
     try {
       // Validate input
       if (!args.id || args.id.trim() === "") {
@@ -153,7 +83,7 @@ export const LinearUpdateIssueTool = createSafeTool({
       try {
         const issueResponse = await enhancedClient.safeGetIssue(args.id);
         if (issueResponse) {
-          teamId = issueResponse.data?.team?.id;
+          teamId = await issueResponse.data?.team?.then((team) => team.id);
         }
       } catch (error) {
         console.error("Error fetching issue for team ID:", error);
@@ -178,7 +108,7 @@ export const LinearUpdateIssueTool = createSafeTool({
       }
       
       // Update the issue
-      const updateIssueResponse = await enhancedClient._updateIssue(args.id, {
+      const updateIssueResponse = await enhancedClient.safeUpdateIssue(args.id, {
         title: args.title,
         description: args.description,
         trashed: args.trashed,
@@ -202,8 +132,8 @@ export const LinearUpdateIssueTool = createSafeTool({
       // Linear SDK returns results in success and entity pattern
       if (updateIssueResponse.success) {
         // Access issue and get ID with the correct data type
-        const issue = await updateIssueResponse.issue;
-        if (issue && issue.id) {
+        const response = updateIssueResponse?.data;
+        if (response && response.issue && response.issue.id) {  
           return {
             content: [{
               type: "text",
@@ -273,14 +203,12 @@ export const LinearUpdateIssueTool = createSafeTool({
         };
       }
       
-      // Format issue data to human-readable text
-      const formattedText = formatIssueToHumanReadable(issueData);
       
       // Return formatted text
       return {
         content: [{
           type: "text",
-          text: formattedText,
+          text: `Status: Success\nMessage: Linear issue updated\nIssue ID: ${issueData.id}`,
         }],
       };
     } catch (error) {

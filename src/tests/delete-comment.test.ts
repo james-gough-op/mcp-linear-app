@@ -1,14 +1,15 @@
+import { DeletePayload, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DeletePayload } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { createErrorResult, createSuccessResult, LinearError } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock success response
 function createMockSuccessResponse(): DeletePayload {
   return {
     success: true,
-    lastSyncId: 12345
+    lastSyncId: 12345,
+    entityId: MOCK_IDS.COMMENT
   } as DeletePayload;
 }
 
@@ -17,8 +18,7 @@ beforeEach(() => {
   // Clear all mocks
   vi.clearAllMocks();
   
-  // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'executeGraphQLMutation');
+  // Set up global spies for methods we need to check in all tests
   vi.spyOn(enhancedClient, 'safeExecuteGraphQLMutation');
 });
 
@@ -26,180 +26,83 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.deleteComment', () => {
+describe('enhancedClient.safeDeleteComment', () => {
   // Happy path
   it('should delete a comment successfully', async () => {
     // Arrange
+    const mockPayload = createMockSuccessResponse();
     const commentId = MOCK_IDS.COMMENT;
-    const mockResponse = createMockSuccessResponse();
+        
+    // Mock the underlying GraphQL method that safeDeleteComment uses
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createSuccessResult({ commentDelete: mockPayload })
+    );
     
-    // Store original method
-    const originalMethod = enhancedClient.executeGraphQLMutation;
+    // Act
+    const result = await enhancedClient.safeDeleteComment(commentId);
     
-    // Create mock function and replace original
-    const mockExecute = vi.fn().mockResolvedValue({
-      data: { commentDelete: mockResponse }
-    });
-    enhancedClient.executeGraphQLMutation = mockExecute;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeDeleteComment(commentId);
-      
-      // Assert
-      expect(result).toEqual(mockResponse);
-      expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('mutation DeleteComment'),
-        { id: commentId }
-      );
-    } finally {
-      // Restore original method
-      enhancedClient.executeGraphQLMutation = originalMethod;
-    }
+    // Assert
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockPayload);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
+      expect.stringContaining('mutation DeleteComment'),
+      { id: commentId }
+    );
   });
   
   // Validation error
-  it('should throw validation error for invalid commentId', async () => {
+  it('should return error result for invalid commentId', async () => {
     // Arrange
     const invalidCommentId = 'invalid-id';
     
-    // Act & Assert
-    await expect(enhancedClient.safeDeleteComment(invalidCommentId)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.safeDeleteComment(invalidCommentId)).rejects.toMatchObject({
-      type: LinearErrorType.VALIDATION
-    });
+    // Act
+    const result = await enhancedClient.safeDeleteComment(invalidCommentId);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
   });
   
   // Error from API
-  it('should propagate API errors', async () => {
+  it('should handle API errors gracefully', async () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
+    const apiError = new LinearError('Entity not found: Comment', LinearErrorType.FeatureNotAccessible);
     
-    // Store original method
-    const originalMethod = enhancedClient.executeGraphQLMutation;
-    
-    // Create mock function that returns a rejected promise
-    const mockExecute = vi.fn().mockRejectedValue(
-      new LinearError('Entity not found: Comment', LinearErrorType.NOT_FOUND)
+    // Mock the underlying GraphQL method that safeDeleteComment uses
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createErrorResult(apiError)
     );
-    enhancedClient.executeGraphQLMutation = mockExecute;
     
-    try {
-      // Act & Assert
-      await expect(enhancedClient.safeDeleteComment(commentId)).rejects.toThrow(LinearError);
-      await expect(enhancedClient.safeDeleteComment(commentId)).rejects.toThrow(/Entity not found: Comment/);
-    } finally {
-      // Restore original method
-      enhancedClient.executeGraphQLMutation = originalMethod;
-    }
+    // Act
+    const result = await enhancedClient.safeDeleteComment(commentId);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toEqual(apiError);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
   });
   
   // Missing response data
-  it('should throw error when response data is missing', async () => {
+  it('should handle missing response data gracefully', async () => {
     // Arrange
     const commentId = MOCK_IDS.COMMENT;
     
-    // Store original method
-    const originalMethod = enhancedClient.safeDeleteComment;
-    
-    // Create mock implementation
-    const mockDeleteComment = vi.fn().mockRejectedValue(
-      new LinearError('Failed to delete comment', LinearErrorType.UNKNOWN)
+    // Mock the underlying GraphQL method that safeDeleteComment uses
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createSuccessResult({ commentDelete: null })
     );
-    enhancedClient.safeDeleteComment = mockDeleteComment;
     
-    try {
-      // Act & Assert
-      await expect(enhancedClient.safeDeleteComment(commentId)).rejects.toThrow('Failed to delete comment');
-    } finally {
-      // Restore original method
-      enhancedClient.safeDeleteComment = originalMethod;
-    }
-  });
-});
-
-describe('enhancedClient.safeDeleteComment', () => {
-  // Happy path
-  it('should return success result with delete payload for valid request', async () => {
-    // Arrange
-    const commentId = MOCK_IDS.COMMENT;
-    const mockResponse = createMockSuccessResponse();
+    // Act
+    const result = await enhancedClient.safeDeleteComment(commentId);
     
-    // Store original method
-    const originalMethod = enhancedClient.safeDeleteComment;
-    
-    // Create mock function
-    const mockDeleteComment = vi.fn().mockResolvedValue(mockResponse);
-    enhancedClient.safeDeleteComment = mockDeleteComment;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeDeleteComment(commentId);
-      
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockResponse);
-      expect(mockDeleteComment).toHaveBeenCalledWith(commentId);
-    } finally {
-      // Restore original method
-      enhancedClient.safeDeleteComment = originalMethod;
-    }
-  });
-  
-  // Error case
-  it('should return error result when deleteComment throws a LinearError', async () => {
-    // Arrange
-    const commentId = MOCK_IDS.COMMENT;
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeDeleteComment;
-    
-    // Create mock function
-    const mockDeleteComment = vi.fn().mockRejectedValue(apiError);
-    enhancedClient.safeDeleteComment = mockDeleteComment;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeDeleteComment(commentId);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toEqual(apiError);
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeDeleteComment = originalMethod;
-    }
-  });
-  
-  // Unknown error
-  it('should convert unknown errors to LinearError', async () => {
-    // Arrange
-    const commentId = MOCK_IDS.COMMENT;
-    const unknownError = new Error('Some unexpected error');
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeDeleteComment;
-    
-    // Create mock function
-    const mockDeleteComment = vi.fn().mockRejectedValue(unknownError);
-    enhancedClient.safeDeleteComment = mockDeleteComment;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeDeleteComment(commentId);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(LinearError);
-      expect(result.error?.type).toBe(LinearErrorType.UNKNOWN);
-      expect(result.error?.message).toContain('Some unexpected error');
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeDeleteComment = originalMethod;
-    }
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.Unknown);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
   });
 }); 

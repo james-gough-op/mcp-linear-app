@@ -1,7 +1,7 @@
+import { CommentPayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CommentCreateInput, CommentPayload } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError, createErrorResult, createSuccessResult } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock comment
@@ -34,33 +34,35 @@ beforeEach(() => {
   // Clear all mocks
   vi.clearAllMocks();
   
-  // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'executeGraphQLMutation');
+  // Set up global spies for methods we need to check in all tests
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLMutation');
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('enhancedClient.safeCreatComment', () => {
+describe('enhancedClient.safeCreateComment', () => {
   // Happy path
   it('should create a comment successfully', async () => {
     // Arrange
     const mockPayload = createMockCommentPayload();
-    const input: CommentCreateInput = {
+    const input: LinearDocument.CommentCreateInput = {
       body: 'Test comment body',
       issueId: MOCK_IDS.ISSUE
     };
-    
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockResolvedValueOnce({
-      data: { commentCreate: mockPayload }
-    });
+
+    // Mock the underlying GraphQL method that safeCreateComment uses
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createSuccessResult({ commentCreate: mockPayload })
+    );
     
     // Act
     const result = await enhancedClient.safeCreateComment(input);
     
     // Assert
-    expect(result).toEqual(mockPayload);
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockPayload);
     expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
     expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledWith(
       expect.stringContaining('mutation CreateComment'),
@@ -69,138 +71,11 @@ describe('enhancedClient.safeCreatComment', () => {
   });
   
   // Validation error - missing body
-  it('should throw validation error for missing body', async () => {
+  it('should return error result for missing body', async () => {
     // Arrange
     const input = {
       issueId: MOCK_IDS.ISSUE
-    } as CommentCreateInput;
-    
-    // Act & Assert
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
-      type: LinearErrorType.VALIDATION
-    });
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
-  });
-  
-  // Validation error - missing context ID
-  it('should throw validation error for missing context ID', async () => {
-    // Arrange
-    const input = {
-      body: 'Test comment body'
-    } as CommentCreateInput;
-    
-    // Act & Assert
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
-      type: LinearErrorType.VALIDATION
-    });
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
-  });
-  
-  // Validation error - invalid issue ID
-  it('should throw validation error for invalid issue ID format', async () => {
-    // Arrange
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: 'invalid-id-format'
-    };
-    
-    // Act & Assert
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
-      type: LinearErrorType.VALIDATION
-    });
-    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
-  });
-  
-  // Error from API
-  it('should propagate API errors', async () => {
-    // Arrange
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: MOCK_IDS.ISSUE
-    };
-    
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockRejectedValueOnce(apiError);
-    
-    // Act & Assert
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(apiError);
-  });
-  
-  // Response validation error
-  it('should throw error when API response is invalid', async () => {
-    // Arrange
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: MOCK_IDS.ISSUE
-    };
-    
-    (enhancedClient.safeExecuteGraphQLMutation as any).mockResolvedValueOnce({
-      data: { commentCreate: null }
-    });
-    
-    // Act & Assert
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toThrow(LinearError);
-    await expect(enhancedClient.safeCreateComment(input)).rejects.toMatchObject({
-      type: LinearErrorType.UNKNOWN
-    });
-  });
-});
-
-describe('enhancedClient.safeCreateComment', () => {
-  // Happy path
-  it('should return success result with comment payload for valid request', async () => {
-    // Arrange
-    const mockPayload = createMockCommentPayload();
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: MOCK_IDS.ISSUE
-    };
-    
-    // Spy on createComment which is used internally by safeCreateComment
-    vi.spyOn(enhancedClient, 'safeCreateComment').mockResolvedValueOnce(mockPayload);
-    
-    // Act
-    const result = await enhancedClient.safeCreateComment(input);
-    
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockPayload);
-    expect(enhancedClient.safeCreateComment).toHaveBeenCalledWith(input);
-  });
-  
-  // Error case - LinearError
-  it('should return error result when createComment throws a LinearError', async () => {
-    // Arrange
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: MOCK_IDS.ISSUE
-    };
-    
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.spyOn(enhancedClient, 'safeCreateComment').mockRejectedValueOnce(apiError);
-    
-    // Act
-    const result = await enhancedClient.safeCreateComment(input);
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
-  });
-  
-  // Error case - Other error
-  it('should return error result when createComment throws a non-LinearError', async () => {
-    // Arrange
-    const input: CommentCreateInput = {
-      body: 'Test comment body',
-      issueId: MOCK_IDS.ISSUE
-    };
-    
-    const genericError = new Error('Generic error');
-    vi.spyOn(enhancedClient, 'safeCreateComment').mockRejectedValueOnce(genericError);
+    } as LinearDocument.CommentCreateInput;
     
     // Act
     const result = await enhancedClient.safeCreateComment(input);
@@ -208,11 +83,85 @@ describe('enhancedClient.safeCreateComment', () => {
     // Assert
     expect(result.success).toBe(false);
     expect(result.error).toBeInstanceOf(LinearError);
-    if (result.error) {
-      expect(result.error.message).toContain('Error in safeCreateComment');
-      expect(result.error.message).toContain('Generic error');
-      expect(result.error.type).toBe(LinearErrorType.UNKNOWN);
-    }
-    expect(result.data).toBeUndefined();
+    expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+  });
+  
+  // Validation error - missing context ID
+  it('should return error result for missing context ID', async () => {
+    // Arrange
+    const input = {
+      body: 'Test comment body'
+    } as LinearDocument.CommentCreateInput;
+    
+    // Act
+    const result = await enhancedClient.safeCreateComment(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+  });
+  
+  // Validation error - invalid issue ID
+  it('should return error result for invalid issue ID format', async () => {
+    // Arrange
+    const input: LinearDocument.CommentCreateInput = {
+      body: 'Test comment body',
+      issueId: 'invalid-id-format'
+    };
+    
+    // Act
+    const result = await enhancedClient.safeCreateComment(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+    expect(enhancedClient.safeExecuteGraphQLMutation).not.toHaveBeenCalled();
+  });
+  
+  // Error from API
+  it('should handle API errors gracefully', async () => {
+    // Arrange
+    const input: LinearDocument.CommentCreateInput = {
+      body: 'Test comment body',
+      issueId: MOCK_IDS.ISSUE
+    };
+    
+    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createErrorResult(apiError)
+    );
+    
+    // Act
+    const result = await enhancedClient.safeCreateComment(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toEqual(apiError);
+    expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
+  });
+  
+  // Response validation error
+  it('should handle invalid API responses gracefully', async () => {
+    // Arrange
+    const input: LinearDocument.CommentCreateInput = {
+      body: 'Test comment body',
+      issueId: MOCK_IDS.ISSUE
+    };
+    
+    vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
+      createSuccessResult({ commentCreate: null })
+    );
+    
+    // Act
+    const result = await enhancedClient.safeCreateComment(input);
+    
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.Unknown);
   });
 });

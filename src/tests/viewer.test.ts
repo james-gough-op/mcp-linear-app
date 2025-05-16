@@ -1,7 +1,7 @@
-import { LinearDocument } from '@linear/sdk';
+import { LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { enhancedClient } from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock user
@@ -82,7 +82,7 @@ describe('enhancedClient.viewer', () => {
     // Arrange
     const authError = new LinearError(
       'User not authenticated',
-      LinearErrorType.AUTHENTICATION
+      LinearErrorType.AuthenticationError
     );
     
     // Mock the safeExecuteGraphQLQuery to return a failed result
@@ -98,7 +98,7 @@ describe('enhancedClient.viewer', () => {
     // Assert
     expect(result.success).toBe(false);
     expect(result.error).toMatchObject({
-      type: LinearErrorType.AUTHENTICATION
+      type: LinearErrorType.AuthenticationError
     });
     expect(result.data).toBeUndefined();
   });
@@ -106,7 +106,7 @@ describe('enhancedClient.viewer', () => {
   // Error from API
   it('should handle API errors gracefully', async () => {
     // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
+    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
     
     // Mock safeExecuteGraphQLQuery to return a failed result
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({

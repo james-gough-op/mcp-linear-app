@@ -5,18 +5,15 @@
  * in the MCP Server.
  */
 
-import {
-    Issue,
-    Team
-} from '../generated/linear-types.js';
+import { Issue, LinearErrorType, Team } from '@linear/sdk';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
 import {
-    CreateIssueSchema,
-    LinearEntityType,
-    validateLinearId,
-    validateLinearIds,
-    validateTeamId
+  CreateIssueSchema,
+  LinearEntityType,
+  validateLinearId,
+  validateLinearIds,
+  validateTeamId
 } from '../libs/id-management.js';
 
 // Custom response type definitions using generated entity types
@@ -73,10 +70,10 @@ async function getTeam(teamId: string): Promise<Team> {
   } catch (error) {
     // Handle errors with proper classification
     if (error instanceof LinearError) {
-      if (error.type === LinearErrorType.VALIDATION) {
+      if (error.type === LinearErrorType.InvalidInput) {
         console.error('Invalid team ID format:', error.message);
         // Handle validation error
-      } else if (error.type === LinearErrorType.NOT_FOUND) {
+      } else if (error.type === LinearErrorType.FeatureNotAccessible) {
         console.error('Team not found:', error.message);
         // Handle not found error
       } else {
@@ -104,7 +101,7 @@ async function createIssue(issueData: unknown): Promise<{success: boolean; issue
       console.error('Invalid issue data:', formatted);
       throw new LinearError(
         'Invalid issue data format',
-        LinearErrorType.VALIDATION,
+        LinearErrorType.InvalidInput,
         result.error
       );
     }
@@ -146,7 +143,7 @@ async function createIssue(issueData: unknown): Promise<{success: boolean; issue
       // Wrap other errors
       throw new LinearError(
         `Error creating issue: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
+        LinearErrorType.Unknown,
         error
       );
     }
@@ -168,7 +165,7 @@ async function moveIssueToProject(issueId: string, projectId: string): Promise<{
       // Handle validation errors
       throw new LinearError(
         `ID validation failed: ${errors.join(', ')}`,
-        LinearErrorType.VALIDATION
+        LinearErrorType.InvalidInput
       );
     }
     
@@ -196,7 +193,7 @@ async function moveIssueToProject(issueId: string, projectId: string): Promise<{
     if (!(error instanceof LinearError)) {
       const linearError = new LinearError(
         `Error moving issue to project: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        LinearErrorType.UNKNOWN,
+        LinearErrorType.Unknown,
         error
       );
       
@@ -248,7 +245,7 @@ async function safeGetIssue(issueId: string): Promise<Issue | null> {
       console.error(`Error getting issue [${error.type}]: ${error.userMessage}`);
       
       // Return null for not found errors, otherwise re-throw
-      if (error.type === LinearErrorType.NOT_FOUND) {
+      if (error.type === LinearErrorType.FeatureNotAccessible) {
         return null;
       }
       throw error;

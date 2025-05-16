@@ -1,5 +1,5 @@
+import { User } from "@linear/sdk";
 import { z } from "zod";
-import { User } from '../../generated/linear-types.js';
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';

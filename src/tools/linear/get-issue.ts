@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { Comment, Issue, WorkflowState } from '../../generated/linear-types.js';
+
+import { Comment, User, WorkflowState } from "@linear/sdk";
 import enhancedClient from '../../libs/client.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
-import { formatDate, getPriorityLabel, safeText } from '../../libs/utils.js';
 
 /**
  * Schema definition for the get issue tool
@@ -20,78 +20,6 @@ interface SubIssueData {
   title: string;
   priority: number;
   status: WorkflowState | null;
-}
-
-/**
- * Format issue data to human readable text
- * Handles all edge cases with safe data processing
- * 
- * @param issue The issue data
- * @param comments The issue comments
- * @param status The status object
- * @param subIssues The sub-issues array
- * @returns Formatted human readable text
- */
-function formatIssueToHumanReadable(
-  issue: Issue, 
-  comments: Comment[], 
-  status: WorkflowState | null,
-  subIssues: SubIssueData[]
-): string {
-  if (!issue || !issue.id) {
-    return "Invalid or incomplete issue data";
-  }
-  
-  // Build formatted output with simpler structure
-  let result = "";
-  
-  // Basic issue information
-  result += `Id: ${issue.id}\n`;
-  result += `Title: ${safeText(issue.title)}\n`;
-  result += `Description: ${safeText(issue.description, "No description")}\n`;
-  
-  // Status and priority
-  result += `Status: ${status && status.name ? status.name : "Unknown"}\n`;
-  result += `Priority: ${getPriorityLabel(issue.priority)}\n`;
-  
-  // Dates
-  result += `Created: ${formatDate(issue.createdAt)}\n`;
-  result += `Updated: ${formatDate(issue.updatedAt)}\n`;
-  
-  // Due date if present
-  if (issue.dueDate) {
-    result += `Due date: ${formatDate(issue.dueDate)}\n`;
-  }
-  
-  // URL
-  result += `Url: ${safeText(issue.url)}\n\n`;
-  
-  // Sub-issues section
-  result += `Sub-issues (${subIssues ? subIssues.length : 0}):\n`;
-  
-  if (subIssues && subIssues.length > 0) {
-    subIssues.forEach((subIssue, index) => {
-      result += `#${index + 1}: ${safeText(subIssue.title)}\n`;
-      result += `Status: ${subIssue.status && subIssue.status.name ? subIssue.status.name : "Unknown"}\n`;
-      result += `Priority: ${getPriorityLabel(subIssue.priority)}\n\n`;
-    });
-  } else {
-    result += "No sub-issues for this issue\n\n";
-  }
-  
-  // Comments section
-  result += `Comments (${comments ? comments.length : 0}):\n`;
-  
-  if (comments && comments.length > 0) {
-    comments.forEach((comment, index) => {
-      result += `Comment #${index + 1}: ${safeText(comment.body)}\n`;
-      result += `Created: ${formatDate(comment.createdAt)}\n\n`;
-    });
-  } else {
-    result += "No comments for this issue\n\n";
-  }
-  
-  return result;
 }
 
 /**
@@ -145,12 +73,8 @@ export const LinearGetIssueTool = createSafeTool({
               body: comment.body || "",
               createdAt: comment.createdAt || new Date().toISOString(),
               updatedAt: comment.updatedAt || new Date().toISOString(),
-              user: comment.user ? {
-                id: comment.user.id,
-                name: comment.user.name,
-                email: comment.user.email
-              } : null
-            } as Comment;
+              user: comment.user ? comment.user as unknown as User : null,
+            } as unknown as Comment;
           });
         }
       } catch (error) {
@@ -161,7 +85,7 @@ export const LinearGetIssueTool = createSafeTool({
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           user: null
-        } as Comment];
+        } as unknown as Comment];
       }
 
       // Extract state information from the issue object
@@ -195,14 +119,12 @@ export const LinearGetIssueTool = createSafeTool({
         });
       }
       
-      // Format issue data to human readable text
-      const formattedText = formatIssueToHumanReadable(issue as unknown as Issue, comments, status, subIssues);
       
       // Return the formatted text
       return {
         content: [{
           type: "text",
-          text: formattedText,
+          text: `Issue ID: ${issue.id}\nTitle: ${issue.title}\nDescription: ${issue.description}\nStatus: ${status?.name}\nSub-issues: ${subIssues.length}`,
         }],
       };
     } catch (error) {

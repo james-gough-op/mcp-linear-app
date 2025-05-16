@@ -1,8 +1,7 @@
-import { LinearDocument } from '@linear/sdk';
+import { LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TeamFilter } from '../generated/linear-types.js';
 import enhancedClient from '../libs/client.js';
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError, createErrorResult, createSuccessResult } from '../libs/errors.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock teams response
@@ -33,8 +32,8 @@ beforeEach(() => {
   // Clear all mocks
   vi.clearAllMocks();
   
-  // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'executeGraphQLQuery');
+  // Set up global spies for methods we need to check in all tests
+  vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
 });
 
 afterEach(() => {
@@ -47,17 +46,18 @@ describe('enhancedClient.safeTeams', () => {
     // Arrange
     const mockTeams = createMockTeamsConnection();
     
-    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
-      data: { teams: mockTeams }
-    });
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
+      createSuccessResult({ teams: mockTeams })
+    );
     
     // Act
     const result = await enhancedClient.safeTeams();
     
     // Assert
-    expect(result).toEqual(mockTeams);
-    expect(enhancedClient.executeGraphQLQuery).toHaveBeenCalledTimes(1);
-    expect(enhancedClient.executeGraphQLQuery).toHaveBeenCalledWith(
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockTeams);
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledTimes(1);
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(
       expect.stringContaining('query Teams'),
       { filter: undefined, first: 50, after: undefined, includeArchived: false }
     );
@@ -67,84 +67,40 @@ describe('enhancedClient.safeTeams', () => {
   it('should apply filter correctly', async () => {
     // Arrange
     const mockTeams = createMockTeamsConnection();
-    const filter: TeamFilter = {
+    const filter: LinearDocument.TeamFilter = {
       name: { contains: 'Test' }
     };
     
-    vi.mocked(enhancedClient.executeGraphQLQuery).mockResolvedValueOnce({
-      data: { teams: mockTeams }
-    });
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
+      createSuccessResult({ teams: mockTeams })
+    );
     
     // Act
     const result = await enhancedClient.safeTeams(filter);
     
     // Assert
-    expect(result).toEqual(mockTeams);
-    expect(enhancedClient.executeGraphQLQuery).toHaveBeenCalledWith(
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual(mockTeams);
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ filter })
     );
   });
   
   // Error from API
-  it('should propagate API errors', async () => {
+  it('should handle API errors gracefully', async () => {
     // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    vi.mocked(enhancedClient.executeGraphQLQuery).mockRejectedValueOnce(apiError);
+    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
+    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
+      createErrorResult(apiError)
+    );
     
-    // Act & Assert
-    await expect(enhancedClient.safeTeams()).rejects.toThrow(apiError);
-  });
-});
-
-describe('enhancedClient.safeTeams', () => {
-  // Happy path
-  it('should return success result with teams data for valid request', async () => {
-    // Arrange
-    const mockTeams = createMockTeamsConnection();
+    // Act
+    const result = await enhancedClient.safeTeams();
     
-    // Store original method
-    const originalMethod = enhancedClient.safeTeams;
-    
-    // Mock the _teams method which is used internally by safeTeams
-    enhancedClient.safeTeams = vi.fn().mockResolvedValueOnce(mockTeams);
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeTeams();
-      
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockTeams);
-      expect(enhancedClient.safeTeams).toHaveBeenCalled();
-    } finally {
-      // Restore original method
-      enhancedClient.safeTeams = originalMethod;
-    }
-  });
-  
-  // Error case
-  it('should return error result when teams throws an error', async () => {
-    // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NETWORK);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeTeams;
-    
-    // Mock the _teams method to throw an error
-    enhancedClient.safeTeams = vi.fn().mockRejectedValueOnce(apiError);
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeTeams();
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toEqual(apiError);
-      expect(result.data).toBeUndefined();
-    } finally {
-      // Restore original method
-      enhancedClient.safeTeams = originalMethod;
-    }
+    // Assert
+    expect(result.success).toBe(false);
+    expect(result.error).toEqual(apiError);
+    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledTimes(1);
   });
 }); 
