@@ -1,30 +1,29 @@
 import {
-  Comment,
-  CommentPayload,
-  Cycle,
-  CycleConnection,
-  CyclePayload,
-  DeletePayload,
-  Issue,
-  IssueConnection,
-  IssueLabelPayload,
-  IssuePayload,
-  LinearClient,
-  LinearDocument,
-  LinearErrorType,
-  LinearRawResponse,
-  Team,
-  TeamConnection,
-  User
+    CommentPayload,
+    Cycle,
+    CycleConnection,
+    CyclePayload,
+    DeletePayload,
+    Issue,
+    IssueConnection,
+    IssueLabelPayload,
+    IssuePayload,
+    LinearClient,
+    LinearDocument,
+    LinearErrorType,
+    LinearRawResponse,
+    Team,
+    TeamConnection,
+    User
 } from '@linear/sdk';
 import dotenv from 'dotenv';
 
 import {
-  LinearError,
-  LinearResult,
-  createErrorResult,
-  createSuccessResult,
-  logLinearError
+    LinearError,
+    LinearResult,
+    createErrorResult,
+    createSuccessResult,
+    logLinearError
 } from './errors.js';
 import { LinearEntityType, validateApiKey, validateLinearId } from './id-management.js';
 
@@ -35,7 +34,7 @@ dotenv.config();
 const envApiKey = process.env.LINEAR_API_KEY;
 
 class EnhancedLinearClient {
-  private linearSdkClient: LinearClient;
+  public linearSdkClient: LinearClient;
 
   constructor(apiKey?: string) {
     const keyToUse = apiKey || envApiKey;
@@ -120,7 +119,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _getIssue(id: string): Promise<Issue> {
+  public async _getIssue(id: string): Promise<Issue> {
     try {
       validateLinearId(id, LinearEntityType.ISSUE);
       const query = `
@@ -234,7 +233,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _createIssue(input: LinearDocument.IssueCreateInput): Promise<IssuePayload> {
+  public async _createIssue(input: LinearDocument.IssueCreateInput): Promise<IssuePayload> {
     try {
       if (!input.teamId) { throw new LinearError('Team ID is required', LinearErrorType.InvalidInput); }
       if (!input.title) { throw new LinearError('Title is required', LinearErrorType.InvalidInput); }
@@ -329,7 +328,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<IssuePayload> {
+  public async _updateIssue(id: string, input: LinearDocument.IssueUpdateInput): Promise<IssuePayload> {
     try {
       validateLinearId(id, LinearEntityType.ISSUE);
       if (Object.keys(input).length === 0) { throw new LinearError('At least one field must be provided for update', LinearErrorType.InvalidInput); }
@@ -424,7 +423,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<IssueConnection> {
+  public async _issues(filter?: LinearDocument.IssueFilter, first: number = 50, after?: string): Promise<IssueConnection> {
     try {
       const query = `
         query GetIssues($filter: IssueFilter, $first: Int, $after: String) {
@@ -504,7 +503,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _createComment(input: LinearDocument.CommentCreateInput): Promise<CommentPayload> {
+  public async _createComment(input: LinearDocument.CommentCreateInput): Promise<CommentPayload> {
     try {
       if (!input.issueId && !input.documentContentId && !input.projectUpdateId && !input.initiativeUpdateId && !input.postId) {
         throw new LinearError('At least one context ID is required', LinearErrorType.InvalidInput);
@@ -558,7 +557,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<CommentPayload> {
+  public async _updateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<CommentPayload> {
     try {
       validateLinearId(id, LinearEntityType.COMMENT);
       if (!input.body) { throw new LinearError('Comment body is required for update', LinearErrorType.InvalidInput); }
@@ -609,7 +608,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _deleteComment(id: string): Promise<DeletePayload> {
+  public async _deleteComment(id: string): Promise<DeletePayload> {
     try {
       validateLinearId(id, LinearEntityType.COMMENT);
       const mutation = `
@@ -640,7 +639,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<IssueLabelPayload> {
+  public async _createIssueLabel(input: LinearDocument.IssueLabelCreateInput): Promise<IssueLabelPayload> {
     try {
       if (!input.name) { throw new LinearError('Label name is required', LinearErrorType.InvalidInput); }
       if (!input.color) { throw new LinearError('Label color is required', LinearErrorType.InvalidInput); }
@@ -676,7 +675,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _teams(filter?: LinearDocument.TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<TeamConnection> {
+  public async _teams(filter?: LinearDocument.TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<TeamConnection> {
     try {
       const query = `
         query Teams($filter: TeamFilter, $first: Int, $after: String, $includeArchived: Boolean) {
@@ -708,7 +707,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _team(id: string): Promise<Team> {
+  public async _team(id: string): Promise<Team> {
     try {
       validateLinearId(id, LinearEntityType.TEAM);
       const query = `
@@ -751,7 +750,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _getViewer(): Promise<User> {
+  public async _getViewer(): Promise<User> {
     try {
       const query = `
         query Viewer {
@@ -793,7 +792,7 @@ class EnhancedLinearClient {
     }
   }
   
-  private async _cycle(id: string): Promise<Cycle> {
+  public async _cycle(id: string): Promise<Cycle> {
     if (!id || id.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
       validateLinearId(id, LinearEntityType.CYCLE);
@@ -842,7 +841,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _cycles(filter?: LinearDocument.CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<CycleConnection> {
+  public async _cycles(filter?: LinearDocument.CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<CycleConnection> {
     try {
       const query = `
         query GetCycles($filter: CycleFilter, $first: Int, $after: String, $includeArchived: Boolean) {
@@ -872,7 +871,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _createCycle(input: LinearDocument.CycleCreateInput): Promise<CyclePayload> {
+  public async _createCycle(input: LinearDocument.CycleCreateInput): Promise<CyclePayload> {
     if (!input.teamId) { throw new LinearError('Team ID is required to create a cycle', LinearErrorType.InvalidInput); }
     try {
       if (input.teamId) { validateLinearId(input.teamId, LinearEntityType.TEAM); }
@@ -904,7 +903,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<CyclePayload> {
+  public async _updateCycle(id: string, input: LinearDocument.CycleUpdateInput): Promise<CyclePayload> {
     if (!id || id.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
       validateLinearId(id, LinearEntityType.CYCLE);
@@ -936,7 +935,7 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _addIssueToCycle(issueId: string, cycleId: string): Promise<IssuePayload> {
+  public async _addIssueToCycle(issueId: string, cycleId: string): Promise<IssuePayload> {
     if (!issueId || issueId.trim() === '') { throw new LinearError('Issue ID cannot be empty', LinearErrorType.InvalidInput); }
     if (!cycleId || cycleId.trim() === '') { throw new LinearError('Cycle ID cannot be empty', LinearErrorType.InvalidInput); }
     try {
@@ -982,44 +981,60 @@ class EnhancedLinearClient {
     }
   }
 
-  private async _getIssueComments(issueId: string): Promise<{ nodes: Array<Comment> }> {
+  // --- PROJECT CREATION ---
+  public async _createProject(input: LinearDocument.ProjectCreateInput): Promise<any> {
     try {
-      validateLinearId(issueId, LinearEntityType.ISSUE);
-      const query = `
-        query GetIssueComments($issueId: String!) {
-          issue(id: $issueId) {
-            comments {
-              nodes { id body createdAt updatedAt editedAt user { id name email } }
+      if (!input.name) { throw new LinearError('Project name is required', LinearErrorType.InvalidInput); }
+      if (!input.teamIds || input.teamIds.length === 0) { throw new LinearError('At least one team ID is required', LinearErrorType.InvalidInput); }
+      const mutation = `
+        mutation CreateProject($input: ProjectCreateInput!) {
+          projectCreate(input: $input) {
+            success
+            project {
+              id
+              name
+              description
+              color
+              state
+              createdAt
+              updatedAt
+              team {
+                id
+                name
+              }
             }
           }
         }
       `;
-      const variables = { issueId };
-      const result = await this.safeExecuteGraphQLQuery<{ issue: { comments: { nodes: Array<Comment> } } }>(query, variables);
-      if (!result.success || !result.data?.issue?.comments) {
-        throw new LinearError(result.error?.message || `Failed to fetch comments for issue with ID ${issueId}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
+      const variables = { input };
+      const result = await this.safeExecuteGraphQLMutation<{ projectCreate: any }>(mutation, variables);
+      if (!result.success || !result.data?.projectCreate) {
+        throw new LinearError(result.error?.message || 'Failed to create project', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
-      return result.data.issue.comments;
+      return result.data.projectCreate;
     } catch (error) {
       if (error instanceof LinearError) { throw error; }
-      throw new LinearError(`Error fetching comments for issue: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      throw new LinearError(`Error creating project: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
   }
-  public async safeGetIssueComments(issueId: string): Promise<LinearResult<{ nodes: Array<Comment> }>> {
+  public async safeCreateProject(input: LinearDocument.ProjectCreateInput): Promise<LinearResult<any>> {
     try {
-      const comments = await this._getIssueComments(issueId);
-      return createSuccessResult<{ nodes: Array<Comment> }>(comments);
+      const resultData = await this._createProject(input);
+      return createSuccessResult<any>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) { return createErrorResult<{ nodes: Array<Comment> }>(error); }
-      const linearError = new LinearError(`Error in safeGetIssueComments: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
-      return createErrorResult<{ nodes: Array<Comment> }>(linearError);
+      if (error instanceof LinearError) { return createErrorResult<any>(error); }
+      const linearError = new LinearError(`Error in safeCreateProject: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      return createErrorResult<any>(linearError);
     }
   }
 }
 
-const enhancedClientInstance = new EnhancedLinearClient();
+// Factory function for DI
+export function getEnhancedClient(apiKey?: string) {
+  return new EnhancedLinearClient(apiKey);
+}
 
-export { enhancedClientInstance as enhancedClient };
-export default enhancedClientInstance;
-
-
+// Default export for backward compatibility with tests
+const enhancedClient = new EnhancedLinearClient();
+export default enhancedClient;
+export { EnhancedLinearClient };

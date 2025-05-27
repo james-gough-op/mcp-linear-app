@@ -1,196 +1,100 @@
+import { LinearDocument } from "@linear/sdk";
 import { z } from "zod";
-
-import { Comment } from "@linear/sdk";
-import enhancedClient from '../../libs/client.js';
+import { getEnhancedClient } from "../../libs/client.js";
+import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { createLogger } from '../../libs/logger.js';
+import { formatDeleteSuccessResponse, formatUpdateSuccessResponse } from '../../libs/response-utils.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
-/**
- * Interface for Linear API comment response
- */
-interface CommentUpdateResponse {
-  success?: boolean;
-  commentUpdate?: {
-    comment: Comment;
-    success: boolean;
-  };
-}
+// Create a logger specific to this component
+const logger = createLogger('UpdateComment');
 
-/**
- * Interface for Linear API delete response
- */
-interface LinearDeleteResponse {
-  success?: boolean;
-  [key: string]: unknown;
-}
-
-/**
- * Update comment tool schema definition
-*/
-const updateCommentSchema = z.object({
-  commentId: z.string().describe("The ID of the comment to update"),
-  comment: z.string().describe("The new content for the comment").optional(),
-  delete: z.boolean().describe("Whether to delete the comment").optional().default(false),
+const baseCommentSchema = z.object({
+    commentId: z.string().min(1, "Comment ID cannot be empty").describe("The ID of the comment to update or delete"),
+    comment: z.string().optional().describe("The new content for the comment. Required if not deleting."),
+    delete: z.boolean().optional().default(false).describe("Set to true to delete the comment."),
 });
 
-/**
- * Tool implementation for updating or deleting a comment on a Linear issue
- * with simple success message format
- */
-export const LinearUpdateCommentTool = createSafeTool({
-  name: "update_comment",
-  description: "A tool that updates or deletes an existing comment on an issue in Linear",
-  schema: updateCommentSchema.shape,
-  handler: async (args: z.infer<typeof updateCommentSchema>) => {
-    try {
-      // Validate input
-      if (!args.commentId || args.commentId.trim() === "") {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Comment ID cannot be empty",
-          }],
-        };
+const updateCommentSchema = baseCommentSchema.refine(data => data.delete || (typeof data.comment === 'string' && data.comment.trim() !== ''), {
+    message: "Comment content cannot be empty if not deleting the comment.",
+    path: ["comment"],
+});
+
+type ValidatedCommentInput = z.infer<typeof updateCommentSchema>;
+
+export function createLinearUpdateCommentTool(enhancedClient = getEnhancedClient()) {
+  return createSafeTool({
+    name: "update_comment",
+    description: "Updates or deletes an existing comment on a Linear issue.",
+    schema: baseCommentSchema.shape,
+    handler: async (args): Promise<McpResponse> => {
+      // Zod validation
+      const parseResult = updateCommentSchema.safeParse(args);
+      if (!parseResult.success) {
+        const firstError = parseResult.error.errors[0];
+        return formatValidationError(firstError.path.join('.') || 'input', firstError.message);
       }
+      const validatedArgs = parseResult.data;
       
-      // Handle delete operation if delete flag is true
-      if (args.delete === true) {
-        // Delete the comment
-        const deleteCommentResponse = await enhancedClient.safeDeleteComment(args.commentId);
-        
-        if (!deleteCommentResponse) {
-          return {
-            content: [{
-              type: "text",
-              text: "Failed to delete comment. Please check the comment ID and try again.",
-            }],
-          };
+      try {
+        if (validatedArgs.delete) {
+          logger.info('Deleting comment', { commentId: validatedArgs.commentId });
+          
+          logger.logApiRequest('DELETE', `comment/${validatedArgs.commentId}`, {});
+          const deleteResult = await enhancedClient.safeDeleteComment(validatedArgs.commentId);
+
+          if (!deleteResult.success) {
+            logger.error('Failed to delete comment', { 
+              commentId: validatedArgs.commentId,
+              error: deleteResult.error?.message 
+            });
+            return formatErrorResponse(deleteResult.error);
+          }
+          
+          logger.info('Comment deleted successfully', { commentId: validatedArgs.commentId });
+          return formatDeleteSuccessResponse('comment', validatedArgs.commentId);
         }
-        
-        // Check if the delete operation was successful
-        const deleteResponse = deleteCommentResponse as unknown as LinearDeleteResponse;
-        
-        if (deleteResponse.success === false) {
-          return {
-            content: [{
-              type: "text",
-              text: "Failed to delete comment. Please check the comment ID and try again.",
-            }],
-          };
+
+        if (!validatedArgs.comment || validatedArgs.comment.trim() === '') {
+          logger.warn('Validation error: empty comment content', { commentId: validatedArgs.commentId });
+          return formatValidationError('comment', 'Comment content cannot be empty');
         }
-        
-        // Return success message for deletion
-        return {
-          content: [{
-            type: "text",
-            text: `Status: Success\nMessage: Linear comment deleted\nComment ID: ${args.commentId}`,
-          }],
+
+        logger.info('Updating comment', { 
+          commentId: validatedArgs.commentId,
+          commentLength: validatedArgs.comment.length 
+        });
+
+        const commentUpdateInput: LinearDocument.CommentUpdateInput = {
+          body: validatedArgs.comment,
         };
-      }
-      
-      // For update operations, comment content is required
-      if (!args.comment || args.comment.trim() === "") {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Comment content cannot be empty for update operations",
-          }],
-        };
-      }
-      
-      // Update the comment
-      const updateCommentResponse = await enhancedClient.safeUpdateComment(args.commentId, {
-        body: args.comment,
-      });
-      
-      if (!updateCommentResponse) {
-        return {
-          content: [{
-            type: "text",
-            text: "Failed to update comment. Please check the comment ID and try again.",
-          }],
-        };
-      }
-      
-      // Getting comment ID from response
-      // Linear SDK returns results in success and entity pattern
-      if (updateCommentResponse.success) {
-        // Access comment and get ID with correct data type
-        const comment = updateCommentResponse.data?.comment;
-        if (comment && comment.id) {
-          return {
-            content: [{
-              type: "text",
-              text: `Status: Success\nMessage: Linear comment updated\nComment ID: ${comment.id}`,
-            }],
-          };
+
+        logger.debug('Prepared comment update input', { input: commentUpdateInput });
+        logger.logApiRequest('PUT', `comment/${validatedArgs.commentId}`, {});
+        const updateResult = await enhancedClient.safeUpdateComment(validatedArgs.commentId, commentUpdateInput);
+
+        if (!updateResult.success || !updateResult.data || !updateResult.data.comment) {
+          logger.error('Failed to update comment', { 
+            commentId: validatedArgs.commentId,
+            error: updateResult.error?.message 
+          });
+          return formatErrorResponse(updateResult.error);
         }
+
+        const updatedComment = await updateResult.data.comment;
+        logger.info('Comment updated successfully', { commentId: updatedComment.id });
+        return formatUpdateSuccessResponse('comment', updatedComment.id);
+
+      } catch (error) {
+        logger.error('Unexpected error updating/deleting comment', { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          commentId: validatedArgs.commentId
+        });
+        return formatCatchErrorResponse(error);
       }
-      
-      // Extract data from response to check for success
-      const commentResponse = updateCommentResponse as unknown as CommentUpdateResponse;
-      
-      // If the response indicates failure, return an error
-      if (commentResponse.success === false) {
-        return {
-          content: [{
-            type: "text",
-            text: "Failed to update comment. Please check the comment ID and try again.",
-          }],
-        };
-      }
-      
-      // Extract comment data from the correct property
-      const commentData: Comment = 
-        (commentResponse.commentUpdate && commentResponse.commentUpdate.comment) || 
-        (updateCommentResponse as unknown as Comment);
-      
-      // Check the parsed response result directly
-      const commentId = commentData?.id || (updateCommentResponse as unknown as { id?: string })?.id;
-      if (commentId) {
-        return {
-          content: [{
-            type: "text",
-            text: `Status: Success\nMessage: Linear comment updated\nComment ID: ${commentId}`,
-          }],
-        };
-      }
-      
-      if (!commentData) {
-        // Show success message even if data is incomplete
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear comment updated",
-          }],
-        };
-      }
-      
-      if (!commentData.id) {
-        // Comment data exists but no ID
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear comment updated (ID not available)",
-          }],
-        };
-      }
-      
-      // Success case with ID available
-      return {
-        content: [{
-          type: "text",
-          text: `Status: Success\nMessage: Linear comment updated\nComment ID: ${commentData.id}`,
-        }],
-      };
-    } catch (error) {
-      // Handle errors gracefully
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return {
-        content: [{
-          type: "text",
-          text: `An error occurred while updating or deleting the comment:\n${errorMessage}`,
-        }],
-      };
     }
-  }
-}); 
+  });
+}
+
+// Default export for production usage
+export const LinearUpdateCommentTool = createLinearUpdateCommentTool();

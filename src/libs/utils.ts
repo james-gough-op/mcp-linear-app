@@ -1,3 +1,5 @@
+import { getEnhancedClient } from './client.js';
+
 /**
  * Helper function to safely convert priority number to descriptive label
  * Handles invalid priority values gracefully
@@ -76,6 +78,27 @@ export function safeText(text: string | null | undefined, defaultText: string = 
  */
 const stateIdCache: Record<string, Record<string, string>> = {};
 
+// Define the structure that matches the GraphQL response
+interface LinearGraphQLTeam {
+  id: string;
+  name: string;
+  key: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  private?: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  states: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      color: string;
+      type: string;
+    }>;
+  };
+}
+
 /**
  * Get state ID from Linear API based on state name and team ID
  * Uses caching to reduce API calls
@@ -91,20 +114,27 @@ export async function getStateId(stateName: string, teamId: string): Promise<str
   }
   
   try {
-    // Import enhancedClient for GraphQL implementation
-    const { enhancedClient } = await import('./client.js');
-    const team = await enhancedClient._team(teamId);
+    // Use the DI-friendly named export
+    const enhancedClient = getEnhancedClient();
     
-    if (!team) {
+    // Use the safe public method instead of the private _team method
+    const teamResult = await enhancedClient.safeTeam(teamId);
+    
+    if (!teamResult.success || !teamResult.data) {
       console.error(`Team with ID ${teamId} not found`);
       return undefined;
     }
     
-    const states = team.states?.nodes || [];
-    if (!states || states.length === 0) {
+    // Cast to our interface that matches the GraphQL response structure
+    const team = teamResult.data as unknown as LinearGraphQLTeam;
+    
+    // Check if states are available in the response
+    if (!team.states || !team.states.nodes || team.states.nodes.length === 0) {
       console.error(`No workflow states found for team ${teamId}`);
       return undefined;
     }
+    
+    const states = team.states.nodes;
     
     // Initialize cache for this team if it doesn't exist
     if (!stateIdCache[teamId]) {

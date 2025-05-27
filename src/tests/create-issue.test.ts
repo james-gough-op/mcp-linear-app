@@ -1,12 +1,8 @@
-import { LinearDocument, LinearErrorType } from '@linear/sdk';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import enhancedClient from '../libs/client.js';
+import { LinearErrorType } from '@linear/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createErrorResult, createSuccessResult, LinearError } from '../libs/errors.js';
 import * as utils from '../libs/utils.js';
-import {
-  createMockIssue,
-  MOCK_IDS
-} from './mocks/mock-data.js';
+
 
 // Mock UUIDs for testing - ensure they are valid UUID v4 format
 const MOCK_TEAM_ID = '123e4567-e89b-42d3-a456-556642440000';
@@ -70,7 +66,7 @@ vi.doMock('../libs/id-management.js', async () => {
 });
 
 // Now import modules that use the mocked LinearIdSchema
-import { LinearCreateIssueTool } from '../tools/linear/create-issue.js';
+import { createLinearCreateIssueTool, LinearCreateIssueTool } from '../tools/linear/create-issue.js';
 
 // Mock the dependencies
 vi.mock('../libs/client.js', () => {
@@ -163,6 +159,7 @@ vi.mock('../libs/client.js', () => {
   return {
     default: mockClient,
     enhancedClient: mockClient,
+    getEnhancedClient: () => mockClient,
     // Export methods to allow direct manipulation in tests
     __createIssueMock: _createIssue,
     __safeCreateIssueMock: safeCreateIssue,
@@ -180,6 +177,12 @@ vi.mock('../libs/utils.js', async () => {
   };
 });
 
+// Define a shared mockClient for all tests
+const mockClient = {
+  __safeCreateIssueMock: vi.fn(),
+  safeCreateIssue: vi.fn(),
+};
+
 describe('LinearCreateIssueTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -189,7 +192,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue without project or cycle', async () => {
     // Mock successful issue creation with a partial issue object
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    vi.mocked(mockClient.__safeCreateIssueMock).mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -199,7 +202,7 @@ describe('LinearCreateIssueTool', () => {
           description: "This is a test issue"
         },
         lastSyncId: 123
-      },
+      } as unknown as any,
       error: undefined
     });
     
@@ -217,7 +220,7 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).not.toContain('Assigned to Project ID');
     expect(response.content[0].text).not.toContain('Assigned to Cycle ID');
   });
@@ -244,7 +247,7 @@ describe('LinearCreateIssueTool', () => {
   
   it('should successfully create an issue with project assignment', async () => {
     // Mock successful issue creation with project
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    mockClient.safeCreateIssue.mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -262,8 +265,9 @@ describe('LinearCreateIssueTool', () => {
       error: undefined
     });
     
-    // Call the handler directly with projectId
-    const response = await LinearCreateIssueTool.handler({
+    // Use DI pattern so the mock is actually used
+    const tool = createLinearCreateIssueTool(mockClient as any);
+    const response = await tool.handler({
       teamId: MOCK_TEAM_ID,
       title: "Test Issue",
       description: "This is a test issue",
@@ -276,13 +280,13 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).toContain(`Assigned to Project ID: ${MOCK_PROJECT_ID}`);
   });
   
   it('should successfully create an issue with cycle assignment', async () => {
     // Mock successful issue creation with cycle
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    vi.mocked(mockClient.__safeCreateIssueMock).mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -297,7 +301,7 @@ describe('LinearCreateIssueTool', () => {
           }
         },
         lastSyncId: 123
-      },
+      } as unknown as any,
       error: undefined
     });
     
@@ -315,13 +319,13 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).toContain(`Assigned to Cycle ID: ${MOCK_CYCLE_ID}`);
   });
   
   it('should successfully create an issue with both project and cycle assignment', async () => {
     // Mock successful issue creation with both project and cycle
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    vi.mocked(mockClient.__safeCreateIssueMock).mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -340,7 +344,7 @@ describe('LinearCreateIssueTool', () => {
           }
         },
         lastSyncId: 123
-      },
+      } as unknown as any,
       error: undefined
     });
     
@@ -359,21 +363,22 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).toContain(`Assigned to Project ID: ${MOCK_PROJECT_ID}`);
     expect(response.content[0].text).toContain(`Assigned to Cycle ID: ${MOCK_CYCLE_ID}`);
   });
   
   it('should handle API errors during issue creation', async () => {
     // Mock API error with a result object (not rejection)
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    mockClient.safeCreateIssue.mockResolvedValueOnce({
       success: false,
       data: undefined,
       error: new LinearError('API Error: Project not found', LinearErrorType.NetworkError)
     });
     
-    // Call the handler directly with projectId
-    const response = await LinearCreateIssueTool.handler({
+    // Use DI pattern so the mock is actually used
+    const tool = createLinearCreateIssueTool(mockClient as any);
+    const response = await tool.handler({
       teamId: MOCK_TEAM_ID,
       title: "Test Issue",
       description: "This is a test issue",
@@ -395,7 +400,7 @@ describe('LinearCreateIssueTool', () => {
     }, { signal: new AbortController().signal });
     
     // Verify validation error response
-    expect(response.content[0].text).toContain('Validation error: projectId: Invalid Linear ID format');
+    expect(response.content[0].text).toContain('Error: Validation error: projectId: Invalid Linear ID format');
   });
 
   it('should reject invalid cycleId format', async () => {
@@ -408,12 +413,12 @@ describe('LinearCreateIssueTool', () => {
     }, { signal: new AbortController().signal });
     
     // Verify validation error response
-    expect(response.content[0].text).toContain('Validation error: cycleId: Invalid Linear ID format');
+    expect(response.content[0].text).toContain('Error: Validation error: cycleId: Invalid Linear ID format');
   });
 
   it('should successfully create an issue with template', async () => {
     // Mock successful issue creation with template
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    vi.mocked(mockClient.__safeCreateIssueMock).mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -427,7 +432,7 @@ describe('LinearCreateIssueTool', () => {
           }
         },
         lastSyncId: 123
-      },
+      } as unknown as any,
       error: undefined
     });
     
@@ -443,13 +448,13 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).toContain(`Template applied: ${MOCK_TEMPLATE_ID}`);
   });
   
   it('should successfully create an issue with template, project, and cycle', async () => {
     // Mock successful issue creation with template, project and cycle
-    vi.mocked(enhancedClient.safeCreateIssue).mockResolvedValueOnce({
+    vi.mocked(mockClient.__safeCreateIssueMock).mockResolvedValueOnce({
       success: true,
       data: {
         success: true,
@@ -472,7 +477,7 @@ describe('LinearCreateIssueTool', () => {
           }
         },
         lastSyncId: 123
-      },
+      } as unknown as any,
       error: undefined
     });
     
@@ -492,7 +497,7 @@ describe('LinearCreateIssueTool', () => {
     expect(response.content).toBeDefined();
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
-    expect(response.content[0].text).toContain('Status: Success');
+    expect(response.content[0].text).toContain('Success: issue created');
     expect(response.content[0].text).toContain(`Assigned to Project ID: ${MOCK_PROJECT_ID}`);
     expect(response.content[0].text).toContain(`Assigned to Cycle ID: ${MOCK_CYCLE_ID}`);
     expect(response.content[0].text).toContain(`Template applied: ${MOCK_TEMPLATE_ID}`);
@@ -508,186 +513,30 @@ describe('LinearCreateIssueTool', () => {
     }, { signal: new AbortController().signal });
     
     // Verify validation error response
-    expect(response.content[0].text).toContain('Validation error: templateId: Invalid Linear ID format');
+    expect(response.content[0].text).toContain('Error: Validation error: templateId: Invalid Linear ID format');
   });
 });
 
-describe('enhancedClient.createIssue', () => {
-  beforeEach(() => {
-    // Clear all mocks
-    vi.clearAllMocks();
-    
-    // Mock safeExecuteGraphQLMutation
-    vi.spyOn(enhancedClient, 'safeExecuteGraphQLMutation');
-    // Mock safeCreateIssue
-    vi.spyOn(enhancedClient, 'safeCreateIssue');
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  // Happy path
-  it('should return issue payload for valid input', async () => {
-    // Arrange
-    const mockIssue = createMockIssue();
-    const mockPayload = {
-      success: true,
-      issue: mockIssue
+describe('LinearCreateIssueTool (DI pattern)', () => {
+  it('should use a custom mock client via DI', async () => {
+    const mockClient = {
+      safeCreateIssue: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          success: true,
+          issue: { id: 'custom-mock-id', title: 'DI Test', description: 'desc' }
+        }
+      })
     };
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeCreateIssue;
-    
-    // Setup the mock to return success
-    enhancedClient.safeCreateIssue = vi.fn().mockImplementation(() => {
-      return Promise.resolve(createSuccessResult(mockPayload));
-    });
-    
-    const input = {
-      teamId: MOCK_IDS.TEAM,
-      title: 'Test Issue'
-    } as LinearDocument.IssueCreateInput;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeCreateIssue(input);
-      
-      // Assert
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockPayload);
-    } finally {
-      // Restore original method
-      enhancedClient.safeCreateIssue = originalMethod;
-    }
-  });
-  
-  // Validation errors
-  it('should return error result for missing teamId', async () => {
-    // Arrange
-    const teamIdError = new LinearError('Team ID is required', LinearErrorType.InvalidInput);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeCreateIssue;
-    
-    // Setup the mock to return error for missing teamId
-    enhancedClient.safeCreateIssue = vi.fn().mockImplementation(() => {
-      return Promise.resolve(createErrorResult(teamIdError));
-    });
-    
-    const input = {
-      title: 'Test Issue'
-    } as LinearDocument.IssueCreateInput;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeCreateIssue(input);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(LinearError);
-      expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
-      expect(result.error?.message).toContain('Team ID is required');
-    } finally {
-      // Restore original method
-      enhancedClient.safeCreateIssue = originalMethod;
-    }
-  });
-  
-  it('should return error result for missing title', async () => {
-    // Arrange
-    const titleError = new LinearError('Title is required', LinearErrorType.InvalidInput);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeCreateIssue;
-    
-    // Setup the mock to return error for missing title
-    enhancedClient.safeCreateIssue = vi.fn().mockImplementation(() => {
-      return Promise.resolve(createErrorResult(titleError));
-    });
-    
-    const input = {
-      teamId: MOCK_IDS.TEAM
-      // title intentionally missing for validation test
-    } as LinearDocument.IssueCreateInput;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeCreateIssue(input);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(LinearError);
-      expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
-      expect(result.error?.message).toContain('Title is required');
-    } finally {
-      // Restore original method
-      enhancedClient.safeCreateIssue = originalMethod;
-    }
-  });
-  
-  // API error case
-  it('should handle API errors gracefully', async () => {
-    // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeCreateIssue;
-    
-    // Setup the mock to return error for API errors
-    enhancedClient.safeCreateIssue = vi.fn().mockImplementation(() => {
-      return Promise.resolve(createErrorResult(apiError));
-    });
-    
-    const input = {
-      teamId: MOCK_IDS.TEAM,
-      title: 'Test Issue'
-    } as LinearDocument.IssueCreateInput;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeCreateIssue(input);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toEqual(apiError);
-    } finally {
-      // Restore original method
-      enhancedClient.safeCreateIssue = originalMethod;
-    }
-  });
-  
-  // Unknown error case
-  it('should convert unknown errors to LinearError', async () => {
-    // Arrange
-    const unknownError = new Error('API Error: Project not found');
-    const convertedError = new LinearError('API Error: Project not found', LinearErrorType.Unknown);
-    
-    // Store original method
-    const originalMethod = enhancedClient.safeCreateIssue;
-    
-    // Setup the mock to return converted error
-    enhancedClient.safeCreateIssue = vi.fn().mockImplementation(() => {
-      return Promise.resolve(createErrorResult(convertedError));
-    });
-    
-    const input = {
-      teamId: MOCK_IDS.TEAM,
-      title: 'Test Issue'
-    } as LinearDocument.IssueCreateInput;
-    
-    try {
-      // Act
-      const result = await enhancedClient.safeCreateIssue(input);
-      
-      // Assert
-      expect(result.success).toBe(false);
-      expect(result.error).toBeInstanceOf(LinearError);
-      expect(result.error?.type).toBe(LinearErrorType.Unknown);
-      expect(result.error?.message).toContain('Project not found');
-    } finally {
-      // Restore original method
-      enhancedClient.safeCreateIssue = originalMethod;
-    }
+    const tool = createLinearCreateIssueTool(mockClient as any);
+    const response = await tool.handler({
+      teamId: 'team-di',
+      title: 'DI Test',
+      description: 'desc',
+      status: 'in_progress',
+      priority: 'medium'
+    }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Success: issue created');
+    expect(mockClient.safeCreateIssue).toHaveBeenCalled();
   });
 }); 

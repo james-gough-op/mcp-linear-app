@@ -15,7 +15,7 @@ let LinearCreateIssueTool: any;
 let mockClient: MockLinearClient;
 
 // Mock the utils.js file to avoid API calls for getting state ID
-vi.doMock('../libs/utils.js', async () => {
+vi.mock('../libs/utils.js', async () => {
   const actual = await vi.importActual('../libs/utils.js');
   return {
     ...actual,
@@ -30,7 +30,7 @@ vi.doMock('../libs/utils.js', async () => {
 });
 
 // Mock the LinearIdSchema and LinearClient before importing modules that use them
-vi.doMock('../libs/id-management.js', async () => {
+vi.mock('../libs/id-management.js', async () => {
   const zodModule = await vi.importActual<typeof import('zod')>('zod');
   const mockLinearIdSchema = zodModule.z.string().refine((val) => {
     // Accept valid UUIDs and mock UUIDs, reject invalid ones
@@ -38,11 +38,26 @@ vi.doMock('../libs/id-management.js', async () => {
   }, {
     message: 'Invalid Linear ID format',
   });
-  return { LinearIdSchema: mockLinearIdSchema };
+  return { 
+    LinearIdSchema: mockLinearIdSchema,
+    validateLinearId: vi.fn().mockReturnValue(true),
+    validateApiKey: vi.fn().mockReturnValue({ valid: true, message: null }),
+    validateTemplateId: vi.fn(),
+    LinearEntityType: { 
+      ISSUE: 'issue',
+      TEAM: 'team',
+      PROJECT: 'project',
+      COMMENT: 'comment',
+      USER: 'user',
+      LABEL: 'label',
+      CYCLE: 'cycle',
+      TEMPLATE: 'template'
+    }
+  };
 });
 
 // Mock client.js with enhanced client
-vi.doMock('../libs/client.js', async () => {
+vi.mock('../libs/client.js', async () => {
   mockClient = new MockLinearClient();
   
   // Convert the safeCreateIssue method to a proper vitest mock function
@@ -95,6 +110,8 @@ vi.doMock('../libs/client.js', async () => {
   return {
     __esModule: true,
     default: mockClient,
+    getEnhancedClient: () => mockClient,
+    enhancedClient: mockClient
   };
 });
 
@@ -145,7 +162,7 @@ describe('LinearCreateIssueTool with Template Support', () => {
     });
 
     // Verify the result contains template information
-    expect(result.content[0].text).toContain('Linear issue created');
+    expect(result.content[0].text).toContain('Success: issue created');
     expect(result.content[0].text).toContain(MOCK_TEMPLATE_ID);
 
     // Verify the method was called with expected args
@@ -234,7 +251,7 @@ describe('LinearCreateIssueTool with Template Support', () => {
     });
 
     // Verify the result contains all referenced IDs
-    expect(result.content[0].text).toContain('Linear issue created');
+    expect(result.content[0].text).toContain('Success: issue created');
     expect(result.content[0].text).toContain(MOCK_PROJECT_ID);
     expect(result.content[0].text).toContain(MOCK_CYCLE_ID);
     expect(result.content[0].text).toContain(MOCK_TEMPLATE_ID);
@@ -291,7 +308,7 @@ describe('LinearCreateIssueTool with Template Support', () => {
     });
 
     // Verify the result includes formatted template information
-    expect(result.content[0].text).toContain('Linear issue created');
+    expect(result.content[0].text).toContain('Success: issue created');
     expect(result.content[0].text).toContain('Template applied: ' + MOCK_TEMPLATE_ID);
     
     if (result.content[0].text.includes('TEMPLATE INFO')) {

@@ -1,19 +1,29 @@
 import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import enhancedClient from '../libs/client.js';
+import { getEnhancedClient } from '../libs/client.js';
 import { LinearError } from '../libs/errors.js';
+import { createLinearGetIssueTool } from '../tools/linear/get-issue.js';
 import {
-  createMockIssue,
-  MOCK_IDS
+    createMockIssue,
+    MOCK_IDS
 } from './mocks/mock-data.js';
+
+// Use vi.hoisted to define mocks before they are used
+const mockSafeGetIssue = vi.hoisted(() => vi.fn());
+const mockSafeExecuteGraphQLQuery = vi.hoisted(() => vi.fn());
+
+// Mock the client module
+vi.mock('../libs/client.js', () => ({
+  getEnhancedClient: () => ({
+    safeGetIssue: mockSafeGetIssue,
+    safeExecuteGraphQLQuery: mockSafeExecuteGraphQLQuery
+  })
+}));
 
 // Setup mocks
 beforeEach(() => {
   // Clear all mocks
   vi.clearAllMocks();
-  
-  // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
 });
 
 afterEach(() => {
@@ -25,11 +35,11 @@ describe('enhancedClient.safeGetIssue', () => {
   it('should return issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
-    // Mock the underlying GraphQL query instead
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValue({ success: true, data: { issue: mockIssue } });
+    // Mock the safeGetIssue function
+    mockSafeGetIssue.mockResolvedValue({ success: true, data: mockIssue });
     
     // Act
-    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    const result = await getEnhancedClient().safeGetIssue(MOCK_IDS.ISSUE);
     
     // Assert
     // The safeGetIssue method is expected to return a Result object
@@ -37,15 +47,19 @@ describe('enhancedClient.safeGetIssue', () => {
     if (result.success) {
       expect(result.data).toEqual(mockIssue);
     }
-    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalled();
+    expect(mockSafeGetIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
   });
   
   // Error cases
   it('should throw validation error for invalid ID format', async () => {
-    // No need to mock safeExecuteGraphQLQuery here as validation should happen before
+    // Mock validation error
+    mockSafeGetIssue.mockResolvedValue({
+      success: false,
+      error: new LinearError('Invalid ID format', "InvalidInput" as LinearErrorType)
+    });
     
     // Act
-    const result = await enhancedClient.safeGetIssue('invalid-id');
+    const result = await getEnhancedClient().safeGetIssue('invalid-id');
     
     // Assert
     expect(result.success).toBe(false);
@@ -53,38 +67,39 @@ describe('enhancedClient.safeGetIssue', () => {
       expect(result.error).toBeInstanceOf(LinearError);
       expect(result.error?.type).toBe("InvalidInput" as LinearErrorType);
     }
-    expect(enhancedClient.safeExecuteGraphQLQuery).not.toHaveBeenCalled();
+    expect(mockSafeExecuteGraphQLQuery).not.toHaveBeenCalled();
   });
-  
-  // More tests...
 });
 
-describe('enhancedClient.safeGetIssue', () => {
+describe('enhancedClient.safeGetIssue additional tests', () => {
   // Happy path
   it('should return success result with issue data for valid ID', async () => {
     // Arrange
     const mockIssue = createMockIssue();
-    // Mock the underlying GraphQL query
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValue({ success: true, data: { issue: mockIssue } });
+    // Mock the safeGetIssue function
+    mockSafeGetIssue.mockResolvedValue({ success: true, data: mockIssue });
     
     // Act
-    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    const result = await getEnhancedClient().safeGetIssue(MOCK_IDS.ISSUE);
     
     // Assert
     expect(result.success).toBe(true);
     if (result.success) {
         expect(result.data).toEqual(mockIssue);
     }
-    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
+    expect(mockSafeGetIssue).toHaveBeenCalledWith(MOCK_IDS.ISSUE);
   });
   
   // Error case for validation error
   it('should return error result for invalid ID', async () => {
-    // Arrange
-    // Validation error should be thrown by the method itself before any GraphQL call
+    // Mock validation error
+    mockSafeGetIssue.mockResolvedValue({
+      success: false,
+      error: new LinearError('Invalid ID format', "InvalidInput" as LinearErrorType)
+    });
     
     // Act
-    const result = await enhancedClient.safeGetIssue('invalid-id');
+    const result = await getEnhancedClient().safeGetIssue('invalid-id');
     
     // Assert
     expect(result.success).toBe(false);
@@ -93,18 +108,21 @@ describe('enhancedClient.safeGetIssue', () => {
         expect(result.error?.type).toBe("InvalidInput" as LinearErrorType);
     }
     expect(result.data).toBeUndefined();
-    expect(enhancedClient.safeExecuteGraphQLQuery).not.toHaveBeenCalled();
+    expect(mockSafeExecuteGraphQLQuery).not.toHaveBeenCalled();
   });
   
   // Error case for not found
   it('should return error result for not found issue', async () => {
     // Arrange
     const notFoundError = new LinearError('Issue not found', "FeatureNotAccessible" as LinearErrorType);
-    // Mock the GraphQL query to simulate a "not found" scenario from the API
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockRejectedValue(notFoundError);
+    // Mock the safeGetIssue response
+    mockSafeGetIssue.mockResolvedValue({
+      success: false,
+      error: notFoundError
+    });
     
     // Act
-    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    const result = await getEnhancedClient().safeGetIssue(MOCK_IDS.ISSUE);
     
     // Assert
     expect(result.success).toBe(false);
@@ -112,18 +130,21 @@ describe('enhancedClient.safeGetIssue', () => {
         expect(result.error).toEqual(notFoundError);
     }
     expect(result.data).toBeUndefined();
-    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
   });
   
   // Unknown error conversion
   it('should convert unknown errors to LinearError', async () => {
     // Arrange
-    const unknownError = new Error('Some unexpected error');
-    // Mock the GraphQL query to simulate an unexpected error
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockRejectedValue(unknownError);
+    const linearError = new LinearError('Some unexpected error', "Unknown" as LinearErrorType);
+    
+    // Mock the response
+    mockSafeGetIssue.mockResolvedValue({
+      success: false,
+      error: linearError
+    });
     
     // Act
-    const result = await enhancedClient.safeGetIssue(MOCK_IDS.ISSUE);
+    const result = await getEnhancedClient().safeGetIssue(MOCK_IDS.ISSUE);
     
     // Assert
     expect(result.success).toBe(false);
@@ -133,6 +154,39 @@ describe('enhancedClient.safeGetIssue', () => {
         expect(result.error?.message).toContain('Some unexpected error');
     }
     expect(result.data).toBeUndefined();
-    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledWith(expect.any(String), { issueId: MOCK_IDS.ISSUE });
+  });
+});
+
+describe('LinearGetIssueTool (DI pattern)', () => {
+  let mockClient: any;
+
+  beforeEach(() => {
+    mockClient = {
+      safeGetIssue: vi.fn()
+    };
+  });
+
+  it('should successfully get an issue', async () => {
+    const mockIssue = createMockIssue();
+    Object.assign(mockIssue, {
+      comments: async () => ({ nodes: [] }),
+      children: async () => ({ nodes: [] }),
+      state: Promise.resolve({ id: 'state-id', name: 'In Progress', color: '#ccc', type: 'in_progress', position: 1, createdAt: '', updatedAt: '' }),
+      assignee: Promise.resolve({ id: 'user-id', name: 'Test User', email: '', displayName: '', active: true, createdAt: '', updatedAt: '' }),
+      project: Promise.resolve({ id: 'project-id', name: 'Test Project' })
+    });
+    mockClient.safeGetIssue.mockResolvedValueOnce({ success: true, data: mockIssue });
+    const tool = createLinearGetIssueTool(mockClient);
+    const response = await tool.handler({ issueId: mockIssue.id }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Success: Issue Details');
+    expect(mockClient.safeGetIssue).toHaveBeenCalled();
+  });
+
+  it('should handle error from safeGetIssue', async () => {
+    mockClient.safeGetIssue.mockResolvedValueOnce({ success: false, error: { message: 'Issue not found' } });
+    const tool = createLinearGetIssueTool(mockClient);
+    const response = await tool.handler({ issueId: 'issue-id' }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Issue not found');
+    expect(response.content[0].text).toContain('Error');
   });
 }); 

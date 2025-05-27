@@ -1,8 +1,11 @@
 import { CommentPayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import enhancedClient from '../libs/client.js';
+import { getEnhancedClient } from '../libs/client.js';
 import { LinearError, createErrorResult, createSuccessResult } from '../libs/errors.js';
+import { createLinearUpdateCommentTool } from '../tools/linear/update-comment.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
+
+const enhancedClient = getEnhancedClient();
 
 // Helper to create a mock comment
 function createMockCommentPayload(): CommentPayload {
@@ -151,5 +154,48 @@ describe('enhancedClient.safeUpdateComment', () => {
     expect(result.error).toBeInstanceOf(LinearError);
     expect(result.error?.type).toBe(LinearErrorType.Unknown);
     expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('LinearUpdateCommentTool (DI pattern)', () => {
+  let mockClient: any;
+  const commentId = MOCK_IDS.COMMENT;
+  const validComment = 'Updated comment';
+
+  beforeEach(() => {
+    mockClient = {
+      safeUpdateComment: vi.fn(),
+      safeDeleteComment: vi.fn(),
+    };
+  });
+
+  it('should update a comment successfully', async () => {
+    mockClient.safeUpdateComment.mockResolvedValueOnce({ success: true, data: { comment: { id: commentId } } });
+    const tool = createLinearUpdateCommentTool(mockClient);
+    const response = await tool.handler({ commentId, comment: validComment }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('updated');
+    expect(mockClient.safeUpdateComment).toHaveBeenCalledWith(commentId, { body: validComment });
+  });
+
+  it('should handle update error', async () => {
+    mockClient.safeUpdateComment.mockResolvedValueOnce({ success: false, error: { message: 'Update failed' } });
+    const tool = createLinearUpdateCommentTool(mockClient);
+    const response = await tool.handler({ commentId, comment: validComment }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Update failed');
+  });
+
+  it('should delete a comment successfully', async () => {
+    mockClient.safeDeleteComment.mockResolvedValueOnce({ success: true });
+    const tool = createLinearUpdateCommentTool(mockClient);
+    const response = await tool.handler({ commentId, delete: true }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('deleted');
+    expect(mockClient.safeDeleteComment).toHaveBeenCalledWith(commentId);
+  });
+
+  it('should handle delete error', async () => {
+    mockClient.safeDeleteComment.mockResolvedValueOnce({ success: false, error: { message: 'Delete failed' } });
+    const tool = createLinearUpdateCommentTool(mockClient);
+    const response = await tool.handler({ commentId, delete: true }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Delete failed');
   });
 }); 

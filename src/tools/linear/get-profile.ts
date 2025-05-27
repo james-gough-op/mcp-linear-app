@@ -1,21 +1,27 @@
-import { User } from "@linear/sdk";
+import { User as LinearUser } from "@linear/sdk";
 import { z } from "zod";
-import enhancedClient from '../../libs/client.js';
+import { getEnhancedClient } from '../../libs/client.js';
+import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatGenericErrorResponse } from '../../libs/error-utils.js';
+import { createLogger } from '../../libs/logger.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
 
+// Create a logger specific to this component
+const logger = createLogger('GetProfile');
+
 /**
  * Format user profile data into human-readable text with simplified format
- * @param profile User profile data
- * @returns Formatted text for human readability
+ * @param profile User profile data, explicitly typed as LinearUser
+ * @returns Formatted text for human readability, or an error message if profile is invalid
  */
-function formatProfileToHumanReadable(profile: User): string {
+function formatProfileToHumanReadable(profile: LinearUser): string {
+  // Ensure profile and profile.id are valid, which should be guaranteed by safeGetViewer if successful
   if (!profile || !profile.id) {
-    return "Invalid or incomplete profile data";
+    return "Error: Invalid or incomplete profile data received for formatting.";
   }
 
   let result = `User ID: ${profile.id}\n`;
-  result += `Name: ${safeText(profile.name)}\n`;
+  result += `Name: ${safeText(profile.name)}\n`; // Name should always exist for a valid User
   
   if (profile.displayName) {
     result += `Display name: ${safeText(profile.displayName)}\n`;
@@ -24,7 +30,8 @@ function formatProfileToHumanReadable(profile: User): string {
   if (profile.email) {
     result += `Email: ${safeText(profile.email)}\n`;
   }
-  
+
+  // active, admin, guest are non-optional booleans in SDK type, so direct access is fine.
   result += `Status: ${profile.active ? "Active" : "Inactive"}\n`;
   result += `Admin: ${profile.admin ? "Yes" : "No"}\n`;
   result += `Guest: ${profile.guest ? "Yes" : "No"}\n`;
@@ -40,8 +47,9 @@ function formatProfileToHumanReadable(profile: User): string {
   if (profile.timezone) {
     result += `Timezone: ${safeText(profile.timezone)}\n`;
   }
-  
-  if (profile.createdIssueCount !== undefined) {
+
+  // Check if createdIssueCount is defined and a number before using it
+  if (typeof profile.createdIssueCount === 'number') {
     result += `Issues created: ${profile.createdIssueCount}\n`;
   }
   
@@ -52,50 +60,63 @@ function formatProfileToHumanReadable(profile: User): string {
   return result;
 }
 
-/**
- * Tool implementation to get the current user's profile
- * formatted as human-readable text with simplified format
- */
-export const LinearGetProfileTool = createSafeTool({
-  name: "get_profile",
-  description: "A tool that gets the current user's profile from Linear",
-  schema: z.object({}).shape,
-  handler: async () => {
-    try {
-      // Get user profile data
-      const profile = await enhancedClient.safeGetViewer();
-      
-      if (!profile) {
+// Factory to create the tool with a provided client (for DI/testing)
+export function createLinearGetProfileTool(enhancedClient = getEnhancedClient()) {
+  return createSafeTool({
+    name: "get_profile",
+    description: "A tool that gets the current user's profile from Linear",
+    schema: z.object({}).shape,
+    handler: async (): Promise<McpResponse> => {
+      try {
+        logger.info('Fetching user profile');
+        
+        // Fetch user profile using the enhanced client
+        logger.logApiRequest('GET', 'viewer', {});
+        const profileResult = await enhancedClient.safeGetViewer();
+
+        if (!profileResult.success || !profileResult.data) {
+          logger.error('Failed to retrieve user profile', { 
+            error: profileResult.error?.message 
+          });
+          return formatErrorResponse(profileResult.error);
+        }
+
+        // Process the user profile data
+        const userProfile = profileResult.data as LinearUser;
+        logger.debug('Profile retrieved successfully', { 
+          userId: userProfile.id,
+          name: userProfile.name 
+        });
+        
+        logger.debug('Formatting profile data');
+        const formattedText = formatProfileToHumanReadable(userProfile);
+
+        // Check if there was an error in formatting
+        if (formattedText.startsWith("Error:")) {
+          logger.warn('Error formatting profile data', { 
+            userId: userProfile.id 
+          });
+          return formatGenericErrorResponse(formattedText.substring(7)); // Remove "Error: " prefix
+        }
+
+        logger.info('Profile data retrieved and formatted successfully', { 
+          userId: userProfile.id 
+        });
         return {
           content: [{
             type: "text",
-            text: "Unable to retrieve user profile. Please check your connection to Linear.",
+            text: `Success: Profile data retrieved.\n\n${formattedText}`,
           }],
         };
+      } catch (error) {
+        logger.error('Unexpected error retrieving profile data', { 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+        return formatCatchErrorResponse(error);
       }
-      
-      // Use the profile directly as User type
-      const userProfile = profile as unknown as User;
-      
-      // Format profile to human-readable text
-      const formattedText = formatProfileToHumanReadable(userProfile);
-      
-      // Return formatted text
-      return {
-        content: [{
-          type: "text",
-          text: formattedText,
-        }],
-      };
-    } catch (error) {
-      // Handle errors gracefully
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return {
-        content: [{
-          type: "text",
-          text: `An error occurred while retrieving profile data:\n${errorMessage}`,
-        }],
-      };
     }
-  }
-}); 
+  });
+}
+
+// Default export for production usage
+export const LinearGetProfileTool = createLinearGetProfileTool();

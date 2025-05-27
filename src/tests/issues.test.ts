@@ -1,10 +1,10 @@
-import { IssueConnection, IssueFilter, LinearErrorType } from '@linear/sdk';
+import { IssueConnection, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import { LinearError, LinearResult } from '../libs/errors.js';
 import {
-    createMockIssue,
-    MOCK_IDS
+  createMockIssue,
+  MOCK_IDS
 } from './mocks/mock-data.js';
 
 // Helper to create a mock IssueConnection
@@ -46,7 +46,7 @@ describe('enhancedClient._issues', () => {
       data: { issues: mockIssuesConnection }
     });
     
-    const filter: IssueFilter = {
+    const filter: LinearDocument.IssueFilter = {
       team: { id: { eq: MOCK_IDS.TEAM } }
     };
     
@@ -121,7 +121,7 @@ describe('enhancedClient.safeIssues', () => {
     // Spy on safeIssues
     vi.spyOn(enhancedClient, 'safeIssues').mockResolvedValueOnce(successResult);
     
-    const filter: IssueFilter = {
+    const filter: LinearDocument.IssueFilter = {
       team: { id: { eq: MOCK_IDS.TEAM } }
     };
     

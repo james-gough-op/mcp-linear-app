@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
-import { LinearApplyLabelsTool } from '../tools/linear/apply-labels.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createLinearApplyLabelsTool, LinearApplyLabelsTool } from '../tools/linear/apply-labels.js';
 import { server } from './mocks/handlers.js';
 import { MOCK_IDS as mockIds } from './mocks/mock-data.js';
 import { setupMockServer } from './mocks/msw-setup.js';
@@ -111,5 +111,52 @@ describe('LinearApplyLabelsTool', () => {
     expect(response.content.length).toBe(1);
     expect(response.content[0].type).toBe('text');
     expect(typeof response.content[0].text).toBe('string');
+  });
+});
+
+describe('LinearApplyLabelsTool (DI pattern)', () => {
+  let mockClient: any;
+
+  beforeEach(() => {
+    mockClient = {
+      safeGetIssue: vi.fn(),
+      safeExecuteGraphQLQuery: vi.fn(),
+      safeUpdateIssue: vi.fn(),
+    };
+  });
+
+  it('should successfully apply labels to an issue', async () => {
+    mockClient.safeGetIssue.mockResolvedValueOnce({ success: true, data: { id: mockIds.ISSUE } });
+    mockClient.safeExecuteGraphQLQuery.mockResolvedValueOnce({
+      success: true,
+      data: { issue: { labels: { nodes: [{ id: mockIds.LABEL }] } } }
+    });
+    mockClient.safeUpdateIssue.mockResolvedValueOnce({ success: true });
+    const tool = createLinearApplyLabelsTool(mockClient);
+    const response = await tool.handler({ issueId: mockIds.ISSUE, labelIds: [mockIds.LABEL, '22223333-4444-4444-b555-666677778888'] }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('applied');
+    expect(response.content[0].text).toContain('labels to issue');
+    expect(mockClient.safeGetIssue).toHaveBeenCalled();
+    expect(mockClient.safeExecuteGraphQLQuery).toHaveBeenCalled();
+    expect(mockClient.safeUpdateIssue).toHaveBeenCalled();
+  });
+
+  it('should handle issue not found', async () => {
+    mockClient.safeGetIssue.mockResolvedValueOnce({ success: false, error: { message: 'Not found' } });
+    const tool = createLinearApplyLabelsTool(mockClient);
+    const response = await tool.handler({ issueId: mockIds.ISSUE, labelIds: [mockIds.LABEL] }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Not found');
+  });
+
+  it('should handle API error on update', async () => {
+    mockClient.safeGetIssue.mockResolvedValueOnce({ success: true, data: { id: mockIds.ISSUE } });
+    mockClient.safeExecuteGraphQLQuery.mockResolvedValueOnce({
+      success: true,
+      data: { issue: { labels: { nodes: [{ id: mockIds.LABEL }] } } }
+    });
+    mockClient.safeUpdateIssue.mockResolvedValueOnce({ success: false, error: { message: 'Update failed' } });
+    const tool = createLinearApplyLabelsTool(mockClient);
+    const response = await tool.handler({ issueId: mockIds.ISSUE, labelIds: [mockIds.LABEL] }, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Update failed');
   });
 }); 

@@ -1,151 +1,91 @@
+import { LinearDocument } from "@linear/sdk";
 import { z } from "zod";
-
-import { Comment } from "@linear/sdk";
-import enhancedClient from '../../libs/client.js';
+import { getEnhancedClient } from '../../libs/client.js';
+import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { createLogger } from '../../libs/logger.js';
+import { formatSuccessResponse } from '../../libs/response-utils.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 
-/**
- * Interface for Linear API comment response
- */
-interface CommentCreateResponse {
-  success?: boolean;
-  commentCreate?: {
-    comment: Comment;
-    success: boolean;
-  };
-}
+// Create a logger specific to this component
+const logger = createLogger('CreateComment');
 
-/**
- * Create comment for issue tool schema definition
-*/
+// Schema definition aligns with LinearDocument.CommentCreateInput structure
 const createCommentSchema = z.object({
   issueId: z.string().describe("The ID of the issue to send a comment to"),
   comment: z.string().describe("The comment to send to the issue"),
 });
 
-/**
- * Tool implementation for creating a comment on a Linear issue
- * with simple success message format
- */
-export const LinearCreateCommentTool = createSafeTool({
-  name: "create_comment",
-  description: "A tool that creates a comment on an issue in Linear",
-  schema: createCommentSchema.shape,
-  handler: async (args: z.infer<typeof createCommentSchema>) => {
-    try {
-      // Validate input
-      if (!args.issueId || args.issueId.trim() === "") {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Issue ID cannot be empty",
-          }],
-        };
+// Type for our validated input
+type ValidatedCommentInput = z.infer<typeof createCommentSchema>;
+
+// Factory to create the tool with a provided client (for DI/testing)
+interface HasSafeCreateComment {
+  safeCreateComment: (input: any) => Promise<any>;
+}
+export function createLinearCreateCommentTool(enhancedClient: HasSafeCreateComment = getEnhancedClient()) {
+  return createSafeTool({
+    name: "create_comment",
+    description: "A tool that creates a comment on an issue in Linear",
+    schema: createCommentSchema.shape,
+    handler: async (args): Promise<McpResponse> => {
+      // Zod validation
+      const parseResult = createCommentSchema.safeParse(args);
+      if (!parseResult.success) {
+        const firstError = parseResult.error.errors[0];
+        return formatValidationError(firstError.path.join('.') || 'input', firstError.message);
       }
-      
-      if (!args.comment || args.comment.trim() === "") {
-        return {
-          content: [{
-            type: "text",
-            text: "Error: Comment content cannot be empty",
-          }],
+      const validatedArgs = parseResult.data;
+
+      try {
+        logger.info('Creating comment', { 
+          issueId: validatedArgs.issueId,
+          commentLength: validatedArgs.comment.length
+        });
+
+        // Map our validated input to LinearDocument.CommentCreateInput
+        const commentInput: LinearDocument.CommentCreateInput = {
+          body: validatedArgs.comment,
+          issueId: validatedArgs.issueId,
         };
-      }
-      
-      // Create the comment
-      const createCommentResponse = await enhancedClient.safeCreateComment({
-        body: args.comment,
-        issueId: args.issueId,
-      });
-      
-      if (!createCommentResponse) {
-        return {
-          content: [{
-            type: "text",
-            text: "Failed to create comment. Please check the issue ID and try again.",
-          }],
-        };
-      }
-      
-      // Linear SDK returns results in success and entity pattern
-      if (createCommentResponse.success) {
-        // Access comment and get ID with the correct data type
-        const comment = await createCommentResponse.comment;
-        if (comment && comment.id) {
-          return {
-            content: [{
-              type: "text",
-              text: `Status: Success\nMessage: Linear comment created\nComment ID: ${comment.id}`,
-            }],
-          };
+
+        logger.debug('Prepared comment input', { input: commentInput });
+        logger.logApiRequest('POST', 'comment', { issueId: validatedArgs.issueId });
+        
+        const createCommentResult = await enhancedClient.safeCreateComment(commentInput);
+
+        if (!createCommentResult.success || !createCommentResult.data) {
+          logger.error('Failed to create comment', { 
+            issueId: validatedArgs.issueId,
+            error: createCommentResult.error?.message 
+          });
+          return formatErrorResponse(createCommentResult.error);
         }
+
+        const commentData = createCommentResult.data;
+        const comment = await commentData.comment;
+
+        if (comment && comment.id) {
+          logger.info('Comment created successfully', { 
+            commentId: comment.id,
+            issueId: validatedArgs.issueId
+          });
+          return formatSuccessResponse("created", "comment", `ID: ${comment.id}, on issue: ${validatedArgs.issueId}`);
+        }
+
+        logger.warn('Comment created but ID not available', { 
+          issueId: validatedArgs.issueId 
+        });
+        return formatSuccessResponse("created", "comment", `on issue: ${validatedArgs.issueId} (ID not available)`);
+      } catch (error) {
+        logger.error('Unexpected error creating comment', { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          issueId: (args as ValidatedCommentInput).issueId
+        });
+        return formatCatchErrorResponse(error);
       }
-      
-      // Extract data from response to check for success
-      const commentResponse = createCommentResponse as unknown as CommentCreateResponse;
-      
-      // If the response indicates failure, return an error
-      if (commentResponse.success === false) {
-        return {
-          content: [{
-            type: "text",
-            text: "Failed to create comment. Please check the issue ID and try again.",
-          }],
-        };
-      }
-      
-      // Extract comment data from the correct property
-      const commentData: Comment = 
-        (commentResponse.commentCreate && commentResponse.commentCreate.comment) || 
-        (createCommentResponse as unknown as Comment);
-      
-      // Check the parsed response result directly
-      const commentId = commentData?.id || (createCommentResponse as unknown as { id?: string })?.id;
-      if (commentId) {
-        return {
-          content: [{
-            type: "text",
-            text: `Status: Success\nMessage: Linear comment created\nComment ID: ${commentId}`,
-          }],
-        };
-      }
-      
-      if (!commentData) {
-        // Show success message even if data is incomplete
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear comment created",
-          }],
-        };
-      }
-      
-      if (!commentData.id) {
-        // Comment data exists but no ID
-        return {
-          content: [{
-            type: "text",
-            text: "Status: Success\nMessage: Linear comment created (ID not available)",
-          }],
-        };
-      }
-      
-      // Success case with ID available
-      return {
-        content: [{
-          type: "text",
-          text: `Status: Success\nMessage: Linear comment created\nComment ID: ${commentData.id}`,
-        }],
-      };
-    } catch (error) {
-      // Handle errors gracefully
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return {
-        content: [{
-          type: "text",
-          text: `An error occurred while creating the comment:\n${errorMessage}`,
-        }],
-      };
     }
-  }
-}); 
+  });
+}
+
+// Default export for production usage
+export const LinearCreateCommentTool = createLinearCreateCommentTool();

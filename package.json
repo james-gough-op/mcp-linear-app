@@ -17,6 +17,7 @@
     "test:errors": "tsc --skipLibCheck && node dist/tests/errors.test.js",
     "test:ids": "tsc --skipLibCheck && node dist/tests/id-management.test.js",
     "test:unit": "vitest run -c vitest.config.js",
+    "test:integration": "vitest run src/tests/integration/**/*.test.ts --typecheck=false",
     "generate-types": "graphql-codegen --config codegen.yml"
   },
   "bin": {

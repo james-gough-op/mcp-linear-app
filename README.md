@@ -18,6 +18,46 @@ Model Context Protocol (MCP) for integration with Linear as an AI tool. This too
 - Node.js 18 or newer
 - Linear API key
 
+## Important Deprecation Notice
+
+> **⚠️ DEPRECATION WARNING ⚠️**  
+> The `linearClient` methods are deprecated and will be removed in a future release.
+> Please use the `enhancedClient` methods instead, which offer improved error handling and type safety.
+> See the [Migration Guide](./linear-client-migration-plan.md) for detailed instructions.
+
+## Type System Improvements
+
+We've completed a comprehensive migration of our custom types to use the official Linear SDK types throughout the codebase. This brings several benefits:
+
+1. **Improved Type Safety**: All tools now use the official Linear SDK types, providing better static type checking and consistency.
+2. **Future-proof**: When the Linear API changes, the SDK will be updated, and our code will automatically benefit.
+3. **Reduced Code**: We've eliminated redundant custom type definitions, making the codebase more maintainable.
+4. **Better Documentation**: The SDK types are well-documented, making it easier to understand the data structures.
+
+See the [Type Migration Plan](./linear-sdk-type-migration-plan.md) for details on the changes made.
+
+## API Standardization and Error Handling
+
+We've implemented standardized patterns for API calls, error handling, and logging throughout the codebase:
+
+1. **Consistent Error Handling**: All tools now use a standardized error handling mechanism with proper error categorization and user-friendly messages.
+2. **Structured Responses**: Tools provide consistent response formats for easier integration and better UX.
+3. **Comprehensive Logging**: The codebase now includes structured logging at multiple levels (debug, info, warn, error) for better debugging and monitoring.
+4. **Best Practices**: All code follows consistent patterns for async operations, error catching, and null safety.
+
+Key improvements include:
+
+- **Error Categorization**: Errors are now classified into categories (Validation, Authentication, Authorization, NotFound, API, Network, Unexpected) with specific handling for each type
+- **Standardized Response Format**: All responses follow a consistent structure for both success and error cases
+- **Detailed Logging**: Each component has its own logger instance with contextual information to trace operations
+- **API Call Tracking**: All API requests, responses, and errors are logged with relevant details
+- **Promise Handling**: Proper handling of LinearSDK's promise-based properties with better error recovery
+- **Type Safety**: Improved type annotations throughout the codebase
+
+These improvements make the codebase more maintainable, easier to debug, and provide a more consistent user experience.
+
+See the [API Standards and Error Handling](./api-standards-and-error-handling.md) document for implementation details.
+
 ## How to Get a Linear API Key
 
 To use this application, you need a Linear API key. Here are the steps to obtain one:
@@ -188,6 +228,43 @@ After configuration, your AI will have access to the following Linear tools:
 - `update_comment` - Update or delete a comment
 - `get_profile` - Get the current Linear user profile
 - `get_team_id` - Get a list of teams and their IDs
+
+## Using the Enhanced Client
+
+For direct integration in your TypeScript/JavaScript applications, you can use the enhanced client API:
+
+```typescript
+import enhancedClient  from '@zalab/mcp-linear-app/libs/client.js';
+
+// Using standard methods (exception-based)
+try {
+  const issue = await enhancedClient.issue('issue_12345');
+  console.log(`Found issue: ${issue.title}`);
+} catch (error) {
+  console.error('Error fetching issue:', error.userMessage);
+}
+
+// Using safe methods (result-based)
+const result = await enhancedClient.safeCreateIssue({
+  teamId: 'team_12345',
+  title: 'Implement feature X',
+  description: 'This feature should...'
+});
+
+if (result.success) {
+  console.log(`Issue created: ${result.data.issue.title}`);
+} else {
+  console.error(`Failed to create issue: ${result.error.userMessage}`);
+}
+```
+
+The enhanced client offers:
+- Type-safe APIs with comprehensive TypeScript types
+- Standardized error handling
+- Both exception-based and result-based error handling patterns
+- Improved performance and reliability
+
+See the [Migration Guide](./linear-client-migration-plan.md) and [API Reference](./docs/api-reference.md) for details.
 
 ## Support and Help
 

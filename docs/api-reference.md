@@ -4,6 +4,31 @@
 
 This document provides comprehensive documentation for the Linear MCP Server API, which enables programmatic interaction with Linear through the MCP Server. The API supports managing labels, projects, cycles, and creating issues with templates.
 
+## Client Implementations
+
+The MCP Server provides two client implementations for interacting with the Linear API:
+
+### enhancedClient (Recommended)
+
+The `enhancedClient` is the recommended implementation for all new development. It provides:
+
+- Standardized error handling with detailed error information
+- Type-safe API with comprehensive TypeScript types
+- Consistent result patterns for both success and error cases
+- Improved performance and reliability
+- Both exception-based and result-based error handling patterns
+
+All methods have both a standard version (e.g., `createIssue`) and a "safe" version (e.g., `safeCreateIssue`):
+- Standard methods throw exceptions when errors occur
+- "Safe" methods return a `LinearResult` object with success/error information
+
+### linearClient (Deprecated)
+
+> **⚠️ DEPRECATED ⚠️**
+>
+> The `linearClient` is deprecated and will be removed in a future release. It is 
+> maintained only for backward compatibility. All new development should use `enhancedClient`.
+
 ## Authentication
 
 All Linear interactions are authenticated using the Linear API key configured in the MCP server. The MCP server itself handles authentication with Linear; you don't need to provide authentication credentials in your requests to the MCP server.
@@ -506,4 +531,564 @@ Searches for Linear issues based on provided query parameters.
 }
 ```
 
-**Linear API**: Uses the `issueSearch` GraphQL query. 
+**Linear API**: Uses the `issueSearch` GraphQL query.
+
+## enhancedClient API Reference
+
+This section documents the methods available in the recommended `enhancedClient` implementation.
+
+### Core GraphQL Methods
+
+#### executeGraphQLQuery
+
+Executes a raw GraphQL query with error handling.
+
+**Signature:**
+```typescript
+async executeGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>>
+```
+
+**Parameters:**
+- `query` (string): The GraphQL query string
+- `variables` (optional object): Variables for the query
+
+**Returns:** The raw GraphQL response
+
+**Throws:** `LinearError` with appropriate type and message
+
+**Example:**
+```typescript
+try {
+  const response = await enhancedClient.executeGraphQLQuery(`
+    query GetIssue($id: ID!) {
+      issue(id: $id) {
+        id
+        title
+        description
+      }
+    }
+  `, { id: "issue_12345" });
+  
+  console.log(response.data.issue);
+} catch (error) {
+  if (error instanceof LinearError) {
+    console.error(error.userMessage);
+  }
+}
+```
+
+#### safeExecuteGraphQLQuery
+
+Safe version of `executeGraphQLQuery` that returns a `LinearResult` instead of throwing exceptions.
+
+**Signature:**
+```typescript
+async safeExecuteGraphQLQuery<T>(query: string, variables?: Record<string, unknown>): Promise<LinearResult<T>>
+```
+
+**Parameters:**
+- `query` (string): The GraphQL query string
+- `variables` (optional object): Variables for the query
+
+**Returns:** A `LinearResult` object with either:
+- `success: true` and the response data, or
+- `success: false` and an error object
+
+**Example:**
+```typescript
+const result = await enhancedClient.safeExecuteGraphQLQuery(`
+  query GetIssue($id: ID!) {
+    issue(id: $id) {
+      id
+      title
+      description
+    }
+  }
+`, { id: "issue_12345" });
+
+if (result.success) {
+  console.log(result.data.issue);
+} else {
+  console.error(result.error.userMessage);
+}
+```
+
+#### executeGraphQLMutation
+
+Executes a GraphQL mutation with error handling.
+
+**Signature:**
+```typescript
+async executeGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearRawResponse<T>>
+```
+
+**Parameters:**
+- `mutation` (string): The GraphQL mutation string
+- `variables` (optional object): Variables for the mutation
+
+**Returns:** The raw GraphQL response
+
+**Throws:** `LinearError` with appropriate type and message
+
+#### safeExecuteGraphQLMutation
+
+Safe version of `executeGraphQLMutation` that returns a `LinearResult` instead of throwing exceptions.
+
+**Signature:**
+```typescript
+async safeExecuteGraphQLMutation<T>(mutation: string, variables?: Record<string, unknown>): Promise<LinearResult<T>>
+```
+
+**Parameters:**
+- `mutation` (string): The GraphQL mutation string
+- `variables` (optional object): Variables for the mutation
+
+**Returns:** A `LinearResult` object
+
+### Issue Management
+
+#### issue
+
+Gets a single issue by ID.
+
+**Signature:**
+```typescript
+async issue(id: string): Promise<Issue>
+```
+
+**Parameters:**
+- `id` (string): The Linear issue ID
+
+**Returns:** An `Issue` object
+
+**Throws:** `LinearError` if the issue doesn't exist or another error occurs
+
+#### safeIssue
+
+Safe version of `issue` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeIssue(id: string): Promise<LinearResult<Issue>>
+```
+
+**Parameters:**
+- `id` (string): The Linear issue ID
+
+**Returns:** A `LinearResult<Issue>` object
+
+#### createIssue
+
+Creates a new issue.
+
+**Signature:**
+```typescript
+async createIssue(input: IssueCreateInput): Promise<IssuePayload>
+```
+
+**Parameters:**
+- `input` (IssueCreateInput): The issue creation parameters
+
+**Returns:** An `IssuePayload` object containing the created issue
+
+**Throws:** `LinearError` if creation fails
+
+#### safeCreateIssue
+
+Safe version of `createIssue` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeCreateIssue(input: IssueCreateInput): Promise<LinearResult<IssuePayload>>
+```
+
+**Parameters:**
+- `input` (IssueCreateInput): The issue creation parameters
+
+**Returns:** A `LinearResult<IssuePayload>` object
+
+#### updateIssue
+
+Updates an existing issue.
+
+**Signature:**
+```typescript
+async updateIssue(id: string, input: IssueUpdateInput): Promise<IssuePayload>
+```
+
+**Parameters:**
+- `id` (string): The Linear issue ID
+- `input` (IssueUpdateInput): The update parameters
+
+**Returns:** An `IssuePayload` object containing the updated issue
+
+**Throws:** `LinearError` if update fails
+
+#### safeUpdateIssue
+
+Safe version of `updateIssue` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeUpdateIssue(id: string, input: IssueUpdateInput): Promise<LinearResult<IssuePayload>>
+```
+
+**Parameters:**
+- `id` (string): The Linear issue ID
+- `input` (IssueUpdateInput): The update parameters
+
+**Returns:** A `LinearResult<IssuePayload>` object
+
+#### issues
+
+Gets issues matching a filter.
+
+**Signature:**
+```typescript
+async issues(filter?: IssueFilter, first: number = 50, after?: string): Promise<IssueConnection>
+```
+
+**Parameters:**
+- `filter` (optional IssueFilter): Filter criteria
+- `first` (optional number): Maximum number of issues to return (default: 50)
+- `after` (optional string): Cursor for pagination
+
+**Returns:** An `IssueConnection` object
+
+**Throws:** `LinearError` if query fails
+
+#### safeIssues
+
+Safe version of `issues` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeIssues(filter?: IssueFilter, first: number = 50, after?: string): Promise<LinearResult<IssueConnection>>
+```
+
+**Parameters:**
+- `filter` (optional IssueFilter): Filter criteria
+- `first` (optional number): Maximum number of issues to return (default: 50)
+- `after` (optional string): Cursor for pagination
+
+**Returns:** A `LinearResult<IssueConnection>` object
+
+### Comment Management
+
+#### createComment
+
+Creates a comment on an issue.
+
+**Signature:**
+```typescript
+async createComment(input: CommentCreateInput): Promise<CommentPayload>
+```
+
+**Parameters:**
+- `input` (CommentCreateInput): The comment creation parameters
+
+**Returns:** A `CommentPayload` object containing the created comment
+
+**Throws:** `LinearError` if creation fails
+
+#### safeCreateComment
+
+Safe version of `createComment` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeCreateComment(input: CommentCreateInput): Promise<LinearResult<CommentPayload>>
+```
+
+**Parameters:**
+- `input` (CommentCreateInput): The comment creation parameters
+
+**Returns:** A `LinearResult<CommentPayload>` object
+
+#### updateComment
+
+Updates an existing comment.
+
+**Signature:**
+```typescript
+async updateComment(id: string, input: CommentUpdateInput): Promise<CommentPayload>
+```
+
+**Parameters:**
+- `id` (string): The Linear comment ID
+- `input` (CommentUpdateInput): The update parameters
+
+**Returns:** A `CommentPayload` object containing the updated comment
+
+**Throws:** `LinearError` if update fails
+
+#### safeUpdateComment
+
+Safe version of `updateComment` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeUpdateComment(id: string, input: CommentUpdateInput): Promise<LinearResult<CommentPayload>>
+```
+
+**Parameters:**
+- `id` (string): The Linear comment ID
+- `input` (CommentUpdateInput): The update parameters
+
+**Returns:** A `LinearResult<CommentPayload>` object
+
+#### deleteComment
+
+Deletes a comment.
+
+**Signature:**
+```typescript
+async deleteComment(id: string): Promise<DeletePayload>
+```
+
+**Parameters:**
+- `id` (string): The Linear comment ID
+
+**Returns:** A `DeletePayload` object
+
+**Throws:** `LinearError` if deletion fails
+
+#### safeDeleteComment
+
+Safe version of `deleteComment` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeDeleteComment(id: string): Promise<LinearResult<DeletePayload>>
+```
+
+**Parameters:**
+- `id` (string): The Linear comment ID
+
+**Returns:** A `LinearResult<DeletePayload>` object
+
+### User Management
+
+#### viewer
+
+Gets the current authenticated user profile.
+
+**Signature:**
+```typescript
+async viewer(): Promise<User>
+```
+
+**Returns:** A `User` object
+
+**Throws:** `LinearError` if authentication fails or other errors occur
+
+#### safeViewer
+
+Safe version of `viewer` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeViewer(): Promise<LinearResult<User>>
+```
+
+**Returns:** A `LinearResult<User>` object
+
+### Team Management
+
+#### team
+
+Gets a single team by ID.
+
+**Signature:**
+```typescript
+async team(id: string): Promise<Team>
+```
+
+**Parameters:**
+- `id` (string): The Linear team ID
+
+**Returns:** A `Team` object
+
+**Throws:** `LinearError` if the team doesn't exist or another error occurs
+
+#### safeTeam
+
+Safe version of `team` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeTeam(id: string): Promise<LinearResult<Team>>
+```
+
+**Parameters:**
+- `id` (string): The Linear team ID
+
+**Returns:** A `LinearResult<Team>` object
+
+#### teams
+
+Gets teams matching a filter.
+
+**Signature:**
+```typescript
+async teams(filter?: TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<TeamConnection>
+```
+
+**Parameters:**
+- `filter` (optional TeamFilter): Filter criteria
+- `first` (optional number): Maximum number of teams to return (default: 50)
+- `after` (optional string): Cursor for pagination
+- `includeArchived` (optional boolean): Whether to include archived teams (default: false)
+
+**Returns:** A `TeamConnection` object
+
+**Throws:** `LinearError` if query fails
+
+#### safeTeams
+
+Safe version of `teams` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeTeams(filter?: TeamFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<LinearResult<TeamConnection>>
+```
+
+**Parameters:**
+- `filter` (optional TeamFilter): Filter criteria
+- `first` (optional number): Maximum number of teams to return (default: 50)
+- `after` (optional string): Cursor for pagination
+- `includeArchived` (optional boolean): Whether to include archived teams (default: false)
+
+**Returns:** A `LinearResult<TeamConnection>` object
+
+### Cycle Management
+
+#### cycle
+
+Gets a single cycle by ID.
+
+**Signature:**
+```typescript
+async cycle(id: string): Promise<Cycle>
+```
+
+**Parameters:**
+- `id` (string): The Linear cycle ID
+
+**Returns:** A `Cycle` object
+
+**Throws:** `LinearError` if the cycle doesn't exist or another error occurs
+
+#### safeCycle
+
+Safe version of `cycle` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeCycle(id: string): Promise<LinearResult<Cycle>>
+```
+
+**Parameters:**
+- `id` (string): The Linear cycle ID
+
+**Returns:** A `LinearResult<Cycle>` object
+
+#### cycles
+
+Gets cycles matching a filter.
+
+**Signature:**
+```typescript
+async cycles(filter?: CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<CycleConnection>
+```
+
+**Parameters:**
+- `filter` (optional CycleFilter): Filter criteria
+- `first` (optional number): Maximum number of cycles to return (default: 50)
+- `after` (optional string): Cursor for pagination
+- `includeArchived` (optional boolean): Whether to include archived cycles (default: false)
+
+**Returns:** A `CycleConnection` object
+
+**Throws:** `LinearError` if query fails
+
+#### safeCycles
+
+Safe version of `cycles` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeCycles(filter?: CycleFilter, first: number = 50, after?: string, includeArchived: boolean = false): Promise<LinearResult<CycleConnection>>
+```
+
+**Parameters:**
+- `filter` (optional CycleFilter): Filter criteria
+- `first` (optional number): Maximum number of cycles to return (default: 50)
+- `after` (optional string): Cursor for pagination
+- `includeArchived` (optional boolean): Whether to include archived cycles (default: false)
+
+**Returns:** A `LinearResult<CycleConnection>` object
+
+#### addIssueToCycle
+
+Adds an issue to a cycle.
+
+**Signature:**
+```typescript
+async addIssueToCycle(issueId: string, cycleId: string): Promise<IssuePayload>
+```
+
+**Parameters:**
+- `issueId` (string): The Linear issue ID
+- `cycleId` (string): The Linear cycle ID
+
+**Returns:** An `IssuePayload` object containing the updated issue
+
+**Throws:** `LinearError` if the operation fails
+
+#### safeAddIssueToCycle
+
+Safe version of `addIssueToCycle` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeAddIssueToCycle(issueId: string, cycleId: string): Promise<LinearResult<IssuePayload>>
+```
+
+**Parameters:**
+- `issueId` (string): The Linear issue ID
+- `cycleId` (string): The Linear cycle ID
+
+**Returns:** A `LinearResult<IssuePayload>` object
+
+### Label Management
+
+#### createIssueLabel
+
+Creates a new issue label.
+
+**Signature:**
+```typescript
+async createIssueLabel(input: IssueLabelCreateInput): Promise<IssueLabelPayload>
+```
+
+**Parameters:**
+- `input` (IssueLabelCreateInput): The label creation parameters
+
+**Returns:** An `IssueLabelPayload` object containing the created label
+
+**Throws:** `LinearError` if creation fails
+
+#### safeCreateIssueLabel
+
+Safe version of `createIssueLabel` that returns a `LinearResult`.
+
+**Signature:**
+```typescript
+async safeCreateIssueLabel(input: IssueLabelCreateInput): Promise<LinearResult<IssueLabelPayload>>
+```
+
+**Parameters:**
+- `input` (IssueLabelCreateInput): The label creation parameters
+
+**Returns:** A `LinearResult<IssueLabelPayload>` object 

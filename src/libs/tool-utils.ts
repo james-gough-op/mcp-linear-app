@@ -75,7 +75,7 @@ export function createSafeTool<T extends ZodRawShape>(
           return {
             content: [{
               type: "text",
-              text: `Validation error: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+              text: `Error: Validation error: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
             }],
             isError: true,
             _meta: {

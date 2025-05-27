@@ -9,6 +9,7 @@
  * Mock IDs - using UUID v4 format following Linear's pattern
  */
 export const MOCK_IDS = {
+  ORGANIZATION: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
   WORKSPACE: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
   USER:      'b2c3d4e5-f6a7-4b8c-ac9d-1f2a3b4c5d6e',
   ASSIGNEE:  'c3d4e5f6-a7b8-4c9d-bf0e-2a3b4c5d6e7f',

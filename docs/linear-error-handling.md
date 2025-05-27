@@ -35,7 +35,8 @@ The MCP Server provides two patterns for handling Linear API errors:
 This pattern throws `LinearError` exceptions that you can catch and handle:
 
 ```typescript
-import { LinearError, LinearErrorType } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
+import { LinearErrorType } from '@linear/sdk';
 
 try {
   // Attempt a GraphQL query
@@ -45,10 +46,10 @@ try {
   if (error instanceof LinearError) {
     // Handle specific error types
     switch (error.type) {
-      case LinearErrorType.RATE_LIMIT:
+      case LinearErrorType.Ratelimited:
         console.log(`Rate limited. Try again in ${error.retryAfter} seconds`);
         break;
-      case LinearErrorType.NOT_FOUND:
+      case LinearErrorType.FeatureNotAccessible:
         console.log('Resource not found:', error.message);
         break;
       // Handle other error types
@@ -82,7 +83,7 @@ if (result.success) {
   console.log('Query failed:', error.userMessage);
   
   // You can still check specific error types
-  if (error.type === LinearErrorType.RATE_LIMIT) {
+  if (error.type === LinearErrorType.Ratelimited) {
     console.log(`Try again in ${error.retryAfter} seconds`);
   }
 }
@@ -156,7 +157,7 @@ if (result.success) {
   notifyUser(result.error.userMessage);
   
   // Special handling for rate limits
-  if (result.error.type === LinearErrorType.RATE_LIMIT) {
+  if (result.error.type === LinearErrorType.Ratelimited) {
     startRetryCountdown(result.error.retryAfter);
   }
 }
@@ -173,12 +174,12 @@ try {
   if (error instanceof LinearError) {
     // Log and handle specific error types
     switch (error.type) {
-      case LinearErrorType.RATE_LIMIT:
+      case LinearErrorType.Ratelimited:
         // Implement exponential backoff
         await delay(error.retryAfter * 1000);
         return retryOperation();
         
-      case LinearErrorType.AUTHENTICATION:
+      case LinearErrorType.AuthenticationError:
         // Trigger authentication refresh
         await refreshCredentials();
         return retryOperation();

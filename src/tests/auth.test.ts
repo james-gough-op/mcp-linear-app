@@ -1,6 +1,6 @@
 import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
+import enhancedClient from '../libs/client.js';
 import { LinearError } from '../libs/errors.js';
 import { validateApiKey } from '../libs/id-management.js';
 

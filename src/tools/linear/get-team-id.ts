@@ -1,74 +1,95 @@
+import { Team as LinearTeam } from "@linear/sdk";
 import { z } from "zod";
-
-import { Team } from "@linear/sdk";
-import enhancedClient from '../../libs/client.js';
+import { getEnhancedClient } from '../../libs/client.js';
+import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { createLogger } from '../../libs/logger.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
+import { safeText } from "../../libs/utils.js";
+
+// Create a logger specific to this component
+const logger = createLogger('GetTeamId');
 
 /**
- * Format team data into human-readable text
- * @param teams Array of team data objects
- * @returns Formatted text for human readability
+ * Format team data into human-readable text.
+ * @param teams Array of team data objects, explicitly typed as LinearTeam[]
+ * @returns Formatted text for human readability, or an informational message if no teams found.
  */
-function formatTeamsToHumanReadable(teams: Team[]): string {
+function formatTeamsToHumanReadable(teams: LinearTeam[]): string {
   if (!teams || teams.length === 0) {
     return "No teams found in your Linear workspace.";
   }
 
-  let result = "";
-  
-  teams.forEach((team, index) => {
-    if (index > 0) {
-      result += "\n";
+  return teams.map(team => {
+    let teamInfo = `Team ID: ${safeText(team.id)}`;
+    if (team.name) {
+      teamInfo += `, Name: ${safeText(team.name)}`;
     }
-    result += `Team ID: ${team.id}`;
-  });
-  
-  return result;
+    return teamInfo;
+  }).join("\n");
 }
 
 /**
- * Tool implementation for getting team IDs from Linear
+ * Factory to create the tool with a provided client (for DI/testing)
  */
-export const LinearGetTeamIdTool = createSafeTool({
-  name: "get_team_id",
-  description: "A tool that gets all teams and their IDs from Linear",
-  schema: z.object({}).shape,
-  handler: async () => {
-    try {
-      // Get teams from Linear
-      const teamsResponse = await enhancedClient.safeTeams();
-      
-      if (!teamsResponse || !teamsResponse.nodes) {
+export function createLinearGetTeamIdTool(enhancedClient = getEnhancedClient()) {
+  return createSafeTool({
+    name: "get_team_id",
+    description: "A tool that gets all teams and their IDs (and names) from Linear",
+    schema: z.object({}).shape,
+    handler: async (args): Promise<McpResponse> => {
+      // Zod validation
+      const parseResult = z.object({}).safeParse(args);
+      if (!parseResult.success) {
+        const firstError = parseResult.error.errors[0];
+        return formatValidationError(firstError.path.join('.') || 'input', firstError.message);
+      }
+
+      try {
+        logger.info('Fetching teams');
+        
+        // Fetch teams using the enhanced client
+        logger.logApiRequest('GET', 'teams', {});
+        const teamsResult = await enhancedClient.safeTeams();
+
+        if (!teamsResult.success || !teamsResult.data?.nodes) {
+          logger.error('Failed to retrieve teams', { 
+            error: teamsResult.error?.message 
+          });
+          return formatErrorResponse(teamsResult.error);
+        }
+
+        // Process the teams data
+        const teams = teamsResult.data.nodes as LinearTeam[];
+        logger.info('Teams retrieved successfully', { count: teams.length });
+        
+        logger.debug('Formatting team data for display');
+        const formattedText = formatTeamsToHumanReadable(teams);
+
+        // Return formatted response
+        if (teams.length === 0) {
+          logger.info('No teams found in workspace');
+          return {
+            content: [{type: "text", text: `Success: ${formattedText}`}],
+            isError: false
+          };
+        }
+
         return {
           content: [{
             type: "text",
-            text: "Could not retrieve teams from Linear. Please check your connection or permissions.",
+            text: `Success: Team IDs retrieved.\n\n${formattedText}`,
           }],
+          isError: false
         };
+      } catch (error) {
+        logger.error('Unexpected error retrieving teams', { 
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        return formatCatchErrorResponse(error);
       }
-      
-      // Use the team nodes directly as Team type
-      const teams = teamsResponse.nodes as unknown as Team[];
-      
-      // Format teams to human-readable text
-      const formattedText = formatTeamsToHumanReadable(teams);
-      
-      // Return formatted text
-      return {
-        content: [{
-          type: "text",
-          text: formattedText,
-        }],
-      };
-    } catch (error) {
-      // Handle errors gracefully
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return {
-        content: [{
-          type: "text",
-          text: `An error occurred while retrieving teams:\n${errorMessage}`,
-        }],
-      };
     }
-  }
-}); 
+  });
+}
+
+// Default export for production usage
+export const LinearGetTeamIdTool = createLinearGetTeamIdTool();

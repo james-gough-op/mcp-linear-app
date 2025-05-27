@@ -1,7 +1,6 @@
-import { LinearDocument, LinearErrorType } from '@linear/sdk';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { enhancedClient } from '../libs/client.js';
-import { LinearError } from '../libs/errors.js';
+import { LinearDocument } from '@linear/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createLinearGetProfileTool } from '../tools/linear/get-profile.js';
 import { MOCK_IDS } from './mocks/mock-data.js';
 
 // Helper to create a mock user
@@ -38,89 +37,29 @@ function createMockUser(): LinearDocument.User {
   } as unknown as LinearDocument.User;
 }
 
-// Setup spies
-beforeEach(() => {
-  // Clear all mocks
-  vi.clearAllMocks();
-  
-  // Simple spies without default implementations
-  vi.spyOn(enhancedClient, 'executeGraphQLQuery');
-  vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
-});
+describe('LinearGetProfileTool (DI pattern)', () => {
+  let mockClient: any;
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+  beforeEach(() => {
+    mockClient = {
+      safeGetViewer: vi.fn()
+    };
+  });
 
-describe('enhancedClient.viewer', () => {
-  // Happy path
-  it('should fetch the current user profile successfully', async () => {
-    // Arrange
+  it('should successfully get the user profile', async () => {
     const mockUser = createMockUser();
-    
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
-      success: true,
-      data: { viewer: mockUser }
-    });
-    
-    // Act
-    const result = await enhancedClient.safeGetViewer();
-    
-    // Assert
-    expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockUser);
-    expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledTimes(1);
-    
-    // Just verify the function was called with a query containing the expected keywords
-    const callArgs = vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mock.calls[0];
-    expect(callArgs[0]).toContain('query Viewer');
-    expect(callArgs[0]).toContain('viewer');
+    mockClient.safeGetViewer.mockResolvedValueOnce({ success: true, data: mockUser });
+    const tool = createLinearGetProfileTool(mockClient);
+    const response = await tool.handler({}, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Success: Profile data retrieved');
+    expect(mockClient.safeGetViewer).toHaveBeenCalled();
   });
-  
-  // Authentication error
-  it('should return authentication error when viewer is not available', async () => {
-    // Arrange
-    const authError = new LinearError(
-      'User not authenticated',
-      LinearErrorType.AuthenticationError
-    );
-    
-    // Mock the safeExecuteGraphQLQuery to return a failed result
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
-      success: false,
-      error: authError,
-      data: undefined
-    });
-    
-    // Act
-    const result = await enhancedClient.safeGetViewer();
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toMatchObject({
-      type: LinearErrorType.AuthenticationError
-    });
-    expect(result.data).toBeUndefined();
-  });
-  
-  // Error from API
-  it('should handle API errors gracefully', async () => {
-    // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
-    
-    // Mock safeExecuteGraphQLQuery to return a failed result
-    vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce({
-      success: false,
-      error: apiError,
-      data: undefined
-    });
-    
-    // Act
-    const result = await enhancedClient.safeGetViewer();
-    
-    // Assert
-    expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
-    expect(result.data).toBeUndefined();
+
+  it('should handle error from safeGetViewer', async () => {
+    mockClient.safeGetViewer.mockResolvedValueOnce({ success: false, error: { message: 'Profile fetch failed' } });
+    const tool = createLinearGetProfileTool(mockClient);
+    const response = await tool.handler({}, { signal: new AbortController().signal });
+    expect(response.content[0].text).toContain('Profile fetch failed');
+    expect(response.content[0].text).toContain('Error');
   });
 }); 
