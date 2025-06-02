@@ -1,10 +1,10 @@
-import { CyclePayload, LinearDocument, LinearErrorType } from '@linear/sdk';
+import { Cycle, CycleConnection, CyclePayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinearError } from '../libs/errors.js';
 import {
-    createSuccessResponse,
-    mockApiResponses,
-    TEST_IDS
+  createSuccessResponse,
+  mockApiResponses,
+  TEST_IDS
 } from './utils/test-utils.js';
 
 // Mock the GraphQL client responses
@@ -53,11 +53,14 @@ describe('Cycle Management Methods', () => {
         }
       };
 
-      vi.mocked(enhancedClient.safeCycle).mockResolvedValueOnce(mockResponse.data.cycle as any);
+      vi.mocked(enhancedClient.safeCycle).mockResolvedValueOnce(
+        createSuccessResponse<Cycle>(mockResponse.data.cycle as unknown as Cycle)
+      );
 
       const result = await enhancedClient.safeCycle(TEST_IDS.CYCLE);
       
-      expect(result).toEqual(mockResponse.data.cycle);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockResponse.data.cycle);
     });
 
     it('should throw an error for invalid cycle ID', async () => {
@@ -117,11 +120,14 @@ describe('Cycle Management Methods', () => {
         }
       };
 
-      vi.mocked(enhancedClient.safeCycles).mockResolvedValueOnce(mockResponse.data.cycles as any);
+      vi.mocked(enhancedClient.safeCycles).mockResolvedValueOnce(
+        createSuccessResponse<CycleConnection>(mockResponse.data.cycles as unknown as CycleConnection)
+      );
 
       const result = await enhancedClient.safeCycles();
       
-      expect(result).toEqual(mockResponse.data.cycles);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockResponse.data.cycles);
     });
   });
 
@@ -248,6 +254,8 @@ describe('Cycle Management Methods', () => {
       
       expect(result).toEqual(mockResponse);
       expect(result.success).toBe(true);
+      // In the context of a test, we can safely bypass type checking when we know the structure
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((result.data as any)?.cycle?.name).toBe('Updated Sprint');
     });
 
@@ -355,6 +363,8 @@ describe('Cycle Management Methods', () => {
         }
       };
 
+      // In a test context, we can use a more simplified mock approach
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(enhancedClient.safeAddIssueToCycle).mockResolvedValueOnce(mockResponse.data.issueUpdate as any);
 
       const result = await enhancedClient.safeAddIssueToCycle(TEST_IDS.ISSUE, TEST_IDS.CYCLE);

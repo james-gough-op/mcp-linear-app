@@ -4,18 +4,12 @@ import { LinearError, LinearResult } from '../libs/errors.js';
 import { createLinearCreateLabelTool, LinearCreateLabelTool } from '../tools/linear/create-label.js';
 import { setupMockServer } from './mocks/msw-setup.js';
 import {
-    createMockClient,
-    createSuccessResponse,
-    expectErrorResponse,
-    expectSuccessResponse,
-    mockApiResponses
+  createMockClient,
+  createSuccessResponse,
+  expectErrorResponse,
+  expectSuccessResponse,
+  mockApiResponses
 } from './utils/test-utils.js';
-
-// Type for GraphQL request
-type GraphQLRequest = {
-  query: string;
-  variables?: Record<string, any>;
-};
 
 // Setup MSW for API mocking
 setupMockServer();

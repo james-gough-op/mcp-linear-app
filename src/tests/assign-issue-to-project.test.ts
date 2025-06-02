@@ -1,13 +1,14 @@
-import { LinearErrorType } from '@linear/sdk';
+import { IssuePayload, LinearErrorType } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LinearResult } from '../libs/errors.js';
 import { createLinearAssignIssueToProjectTool, LinearAssignIssueToProjectTool } from '../tools/linear/assign-issue-to-project.js';
 import {
-    createMockClient,
-    expectErrorResponse,
-    expectSuccessResponse,
-    INVALID_IDS,
-    mockApiResponses,
-    TEST_IDS
+  createMockClient,
+  expectErrorResponse,
+  expectSuccessResponse,
+  INVALID_IDS,
+  mockApiResponses,
+  TEST_IDS
 } from './utils/test-utils.js';
 
 // For the non-DI pattern tests, we need to mock the client module
@@ -57,7 +58,7 @@ describe('LinearAssignIssueToProjectTool', () => {
     const mockResponse = {
       success: true,
       data: { success: true, issue: Promise.resolve(mockIssue) }
-    } as any;
+    } as unknown as LinearResult<IssuePayload>;
     
     // Get the mockClient from the mocked module
     const { getEnhancedClient } = await import('../libs/client.js');
@@ -123,7 +124,7 @@ describe('LinearAssignIssueToProjectTool (DI pattern)', () => {
     mockClient.safeUpdateIssue.mockResolvedValueOnce({
       success: true,
       data: { success: true, issue: Promise.resolve(mockIssue) }
-    } as any);
+    } as unknown as LinearResult<IssuePayload>);
     
     const tool = createLinearAssignIssueToProjectTool(mockClient);
     const response = await tool.handler(

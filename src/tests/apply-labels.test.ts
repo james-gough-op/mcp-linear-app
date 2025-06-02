@@ -1,6 +1,6 @@
 import { LinearErrorType } from '@linear/sdk';
 import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, Mock, vi } from 'vitest';
 import { createLinearApplyLabelsTool, LinearApplyLabelsTool } from '../tools/linear/apply-labels.js';
 import { server } from './mocks/handlers.js';
 import { MOCK_IDS as mockIds } from './mocks/mock-data.js';
@@ -14,7 +14,7 @@ import {
 // GraphQL request type
 type GraphQLRequest = {
   query: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 };
 
 // Setup MSW for API mocking
@@ -250,7 +250,7 @@ describe('LinearApplyLabelsTool (DI pattern)', () => {
       data: { id: TEST_IDS.ISSUE } 
     });
     
-    (mockClient.safeExecuteGraphQLQuery as any).mockResolvedValueOnce({
+    (mockClient.safeExecuteGraphQLQuery as unknown as Mock).mockResolvedValueOnce({
       success: true,
       data: { issue: { labels: { nodes: [{ id: TEST_IDS.LABEL }] } } }
     });
@@ -295,7 +295,7 @@ describe('LinearApplyLabelsTool (DI pattern)', () => {
       data: { id: TEST_IDS.ISSUE } 
     });
     
-    (mockClient.safeExecuteGraphQLQuery as any).mockResolvedValueOnce({
+    (mockClient.safeExecuteGraphQLQuery as unknown as Mock).mockResolvedValueOnce({
       success: true,
       data: { issue: { labels: { nodes: [{ id: TEST_IDS.LABEL }] } } }
     });
