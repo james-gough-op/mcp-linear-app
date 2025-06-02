@@ -41,7 +41,7 @@ export class TestEntityTracker {
    */
   static async cleanup(): Promise<void> {
     // Import the Linear client and enhanced client
-    const { enhancedClient } = (await import('../libs/client.js'));
+    const enhancedClient = (await import('../libs/client.js')).default;
     
     // Clean up comments first (as they may depend on issues)
     const comments = this.entities.get('comments') || [];

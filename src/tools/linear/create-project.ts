@@ -1,7 +1,8 @@
-import { LinearDocument, Project } from "@linear/sdk";
+import { LinearDocument, LinearErrorType } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearError } from '../../libs/errors.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createLogger } from '../../libs/logger.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
@@ -42,48 +43,6 @@ const createProjectSchema = z.object({
  * Type for validated input from Zod schema
  */
 type ValidatedProjectInput = z.infer<typeof createProjectSchema>;
-
-/**
- * Format project data into human-readable text
- * @param project Project data to format
- * @param teamIds Array of team IDs associated with the project
- * @returns Formatted text for human readability
- */
-function formatProjectToHumanReadable(project: Project, teamIds: string[]): string {
-  if (!project || !project.id) {
-    return "Error: Invalid or incomplete project data provided for formatting.";
-  }
-
-  let result = "LINEAR PROJECT DETAILS\n";
-  result += "=======================\n\n";
-
-  // Basic information
-  result += `--- PROJECT DETAILS ---\n`;
-  result += `ID: ${project.id}\n`;
-  result += `NAME: ${safeText(project.name)}\n`;
-
-  if (project.description) {
-    result += `DESCRIPTION: ${safeText(project.description)}\n`;
-  }
-
-  if (project.color) {
-    result += `COLOR: ${safeText(project.color)}\n`;
-  }
-
-  if (project.state) {
-    result += `STATE: ${safeText(project.state)}\n`;
-  }
-
-  // Add team IDs
-  if (teamIds && teamIds.length > 0) {
-    result += `\n--- TEAM INFO ---\n`;
-    teamIds.forEach((teamId: string, index: number) => {
-      result += `TEAM ${index + 1} ID: ${teamId}\n`;
-    });
-  }
-
-  return result;
-}
 
 // Factory to create the tool with a provided client (for DI/testing)
 export function createLinearCreateProjectTool(enhancedClient = getEnhancedClient()) {
@@ -162,7 +121,12 @@ export function createLinearCreateProjectTool(enhancedClient = getEnhancedClient
         }
         
         logger.warn('Project creation reported success, but project data is missing');
-        return formatErrorResponse(new Error('Project creation reported success, but project data or ID is missing in the response.') as any);
+        return formatErrorResponse(
+          new LinearError(
+            'Project creation reported success, but project data or ID is missing in the response.',
+            'Unknown' as LinearErrorType
+          )
+        );
       } catch (error) {
         logger.error('Unexpected error creating project', {
           error: error instanceof Error ? error.message : 'Unknown error',

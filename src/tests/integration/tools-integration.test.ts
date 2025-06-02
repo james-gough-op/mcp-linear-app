@@ -72,10 +72,10 @@ const MOCK_LABEL_ID = MOCK_IDS.LABEL;
 
 // Type definitions for mocked functions
 type MockedFunction<T> = T & {
-  mockResolvedValue: (value: any) => void;
-  mockResolvedValueOnce: (value: any) => void;
-  mockImplementation: (fn: (...args: any[]) => any) => void;
-  mock: { calls: any[][] };
+  mockResolvedValue: (value: unknown) => void;
+  mockResolvedValueOnce: (value: unknown) => void;
+  mockImplementation: (fn: (...args: unknown[]) => unknown) => void;
+  mock: { calls: unknown[][] };
 };
 
 // Create a mock client with partial implementation of EnhancedLinearClient
@@ -135,14 +135,14 @@ const mockClient = {
   safeCreateComment: MockedFunction<(input: LinearDocument.CommentCreateInput) => Promise<LinearResult<CommentPayload>>>;
   safeTeam: MockedFunction<(id: string) => Promise<LinearResult<Team>>>;
   safeTeams: MockedFunction<(filter?: LinearDocument.TeamFilter, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<TeamConnection>>>;
-  safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<any>>>;
+  safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<unknown>>>;
   safeUpdateComment: MockedFunction<(id: string, input: LinearDocument.CommentUpdateInput) => Promise<LinearResult<CommentPayload>>>;
   safeDeleteComment: MockedFunction<(id: string) => Promise<LinearResult<DeletePayload>>>;
-  safeCreateLabel: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-  safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<any>>>;
-  safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<any>>>;
+  safeCreateLabel: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+  safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<unknown>>>;
+  safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<unknown>>>;
   safeAddIssueToCycle: MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<IssuePayload>>>;
-  safeCreateProject: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
+  safeCreateProject: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
   safeGetViewer: MockedFunction<() => Promise<LinearResult<User>>>;
 };
 
@@ -362,33 +362,27 @@ vi.mock('../../libs/utils.js', () => ({
   normalizeStateName: vi.fn(name => name),
   safeText: vi.fn(text => text || "None"),
   formatDate: vi.fn(date => date ? new Date(date).toISOString() : "None"),
-  getPriorityLabel: vi.fn(priority => "Medium"),
+  getPriorityLabel: vi.fn(() => "Medium"),
 }));
 
 // Helper to extract the text content from a response
-const getResponseText = (response: any): string => {
-  return response?.content?.[0]?.text || '';
+const getResponseText = (response: unknown): string => {
+  return (response as { content?: { text?: string }[] })?.content?.[0]?.text || '';
 };
 
 // Helper to check if a response indicates success
-const expectSuccessResponse = (response: any) => {
-  // Since we're dealing with different response formats, simply check content
+const expectSuccessResponse = (response: unknown) => {
   const text = getResponseText(response);
   expect(text).not.toContain('Error:');
   expect(text).not.toContain('Failed:');
-  // Some responses mention "No comments or failed to load comments"
-  // so we can't check for "failed" directly
   expect(text.toLowerCase()).not.toMatch(/\bfailed\b(?! to load)/i);
 };
 
 // Helper to check if a response indicates an error of a specific type
-const expectErrorResponse = (response: any, errorType: string) => {
-  // Since we're dealing with different response formats, simply check content
+const expectErrorResponse = (response: unknown, errorType: string) => {
   const text = getResponseText(response);
   expect(text.toLowerCase()).toMatch(/error|failed/i);
   
-  // LinearErrorType.NotFound becomes "not found" in the error message
-  // but we might be getting a more generic message for this error type
   if (errorType === 'not found') {
     expect(text.toLowerCase()).toMatch(/not found|resource not found|unexpected error|failed to update|invalid linear id format/i);
   } else {
@@ -616,7 +610,7 @@ describe('Linear Tools Integration Tests', () => {
       
       const mockIssueWithComments = createMockIssue();
       // Cast to any to allow adding the comments function
-      (mockIssueWithComments as any).comments = () => Promise.resolve({ nodes: [mockComment] });
+      (mockIssueWithComments as unknown as { comments: () => Promise<{ nodes: unknown[] }> }).comments = () => Promise.resolve({ nodes: [mockComment] });
       
       // Setup the mock - first for the issue check, then for the comments
       mockClient.safeGetIssue.mockResolvedValue(mockApiResponses.mockGetIssue(mockIssueWithComments));

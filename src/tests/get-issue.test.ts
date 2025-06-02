@@ -126,7 +126,6 @@ describe('LinearGetIssueTool', () => {
 
   it('should handle validation error for missing issueId', async () => {
     const tool = createLinearGetIssueTool(mockClient);
-    // @ts-ignore - Deliberately passing invalid args to test validation
     const response = await tool.handler({}, { signal: new AbortController().signal });
     
     expectErrorResponse(response, 'validation');

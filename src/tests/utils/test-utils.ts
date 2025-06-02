@@ -9,10 +9,10 @@ import { LinearError, LinearResult } from '../../libs/errors.js';
 
 // Type definitions for mocked functions
 export type MockedFunction<T> = T & {
-  mockResolvedValue: (value: any) => void;
-  mockResolvedValueOnce: (value: any) => void;
-  mockImplementation: (fn: (...args: any[]) => any) => void;
-  mock: { calls: any[][] };
+  mockResolvedValue: (value: unknown) => void;
+  mockResolvedValueOnce: (value: unknown) => void;
+  mockImplementation: (fn: (...args: unknown[]) => unknown) => void;
+  mock: { calls: unknown[][] };
 };
 
 // Common mock IDs for testing
@@ -38,12 +38,16 @@ export const INVALID_IDS = {
 };
 
 // Helper to extract the text content from a tool response
-export const getResponseText = (response: any): string => {
-  return response?.content?.[0]?.text || '';
+export const getResponseText = (response: unknown): string => {
+  if (typeof response === 'object' && response !== null && 'content' in response) {
+    const content = (response as { content?: { text?: string }[] }).content;
+    return content?.[0]?.text || '';
+  }
+  return '';
 };
 
 // Helper to check if a tool response indicates success
-export const expectSuccessResponse = (response: any) => {
+export const expectSuccessResponse = (response: unknown) => {
   const text = getResponseText(response);
   expect(text).not.toContain('Error:');
   expect(text).not.toContain('Failed:');
@@ -53,7 +57,7 @@ export const expectSuccessResponse = (response: any) => {
 };
 
 // Helper to check if a tool response indicates an error of a specific type
-export const expectErrorResponse = (response: any, errorType: string) => {
+export const expectErrorResponse = (response: unknown, errorType: string) => {
   const text = getResponseText(response);
   expect(text.toLowerCase()).toMatch(/error|failed/i);
   
@@ -325,49 +329,49 @@ export const mockApiResponses = {
 
 // Create a standard mock client factory
 export const createMockClient = (): EnhancedLinearClient & {
-  safeGetIssue: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-  safeCreateIssue: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-  safeUpdateIssue: MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>;
-  safeIssues: MockedFunction<(filter?: any, first?: number, after?: string) => Promise<LinearResult<any>>>;
-  safeCreateComment: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-  safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<any>>>;
-  safeUpdateComment: MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>;
-  safeDeleteComment: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-  safeTeam: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-  safeTeams: MockedFunction<(filter?: any, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<any>>>;
-  safeCreateIssueLabel: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-  safeCreateLabel: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-  safeGetViewer: MockedFunction<() => Promise<LinearResult<any>>>;
-  safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<any>>>;
-  safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<any>>>;
-  safeAddIssueToCycle: MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<any>>>;
-  safeCreateProject: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
+  safeGetIssue: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+  safeCreateIssue: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+  safeUpdateIssue: MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>;
+  safeIssues: MockedFunction<(filter?: unknown, first?: number, after?: string) => Promise<LinearResult<unknown>>>;
+  safeCreateComment: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+  safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<unknown>>>;
+  safeUpdateComment: MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>;
+  safeDeleteComment: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+  safeTeam: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+  safeTeams: MockedFunction<(filter?: unknown, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<unknown>>>;
+  safeCreateIssueLabel: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+  safeCreateLabel: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+  safeGetViewer: MockedFunction<() => Promise<LinearResult<unknown>>>;
+  safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<unknown>>>;
+  safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<unknown>>>;
+  safeAddIssueToCycle: MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<unknown>>>;
+  safeCreateProject: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
 } => {
   return {
-    linearSdkClient: { client: {} } as any,
-    client: {} as any,
+    linearSdkClient: { client: {} } as unknown,
+    client: {} as unknown,
     executeGraphQLQuery: vi.fn(),
     executeGraphQLMutation: vi.fn(),
     safeExecuteGraphQLQuery: vi.fn(),
     safeExecuteGraphQLMutation: vi.fn(),
     safeExecuteGraphQL: vi.fn(),
-    safeGetIssue: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<any>>>,
-    safeCreateIssue: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
-    safeUpdateIssue: vi.fn() as MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>,
-    safeIssues: vi.fn() as MockedFunction<(filter?: any, first?: number, after?: string) => Promise<LinearResult<any>>>,
-    safeCreateComment: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
-    safeGetComment: vi.fn() as MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<any>>>,
-    safeUpdateComment: vi.fn() as MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>,
-    safeDeleteComment: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<any>>>,
-    safeTeam: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<any>>>,
-    safeTeams: vi.fn() as MockedFunction<(filter?: any, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<any>>>,
-    safeCreateIssueLabel: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
-    safeCreateLabel: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
-    safeGetViewer: vi.fn() as MockedFunction<() => Promise<LinearResult<any>>>,
-    safeApplyLabels: vi.fn() as MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<any>>>,
-    safeAssignIssueToProject: vi.fn() as MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<any>>>,
-    safeAddIssueToCycle: vi.fn() as MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<any>>>,
-    safeCreateProject: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
+    safeGetIssue: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<unknown>>>,
+    safeCreateIssue: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
+    safeUpdateIssue: vi.fn() as MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>,
+    safeIssues: vi.fn() as MockedFunction<(filter?: unknown, first?: number, after?: string) => Promise<LinearResult<unknown>>>,
+    safeCreateComment: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
+    safeGetComment: vi.fn() as MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<unknown>>>,
+    safeUpdateComment: vi.fn() as MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>,
+    safeDeleteComment: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<unknown>>>,
+    safeTeam: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<unknown>>>,
+    safeTeams: vi.fn() as MockedFunction<(filter?: unknown, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<unknown>>>,
+    safeCreateIssueLabel: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
+    safeCreateLabel: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
+    safeGetViewer: vi.fn() as MockedFunction<() => Promise<LinearResult<unknown>>>,
+    safeApplyLabels: vi.fn() as MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<unknown>>>,
+    safeAssignIssueToProject: vi.fn() as MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<unknown>>>,
+    safeAddIssueToCycle: vi.fn() as MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<unknown>>>,
+    safeCreateProject: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
     _getIssue: vi.fn(),
     _createIssue: vi.fn(),
     _updateIssue: vi.fn(),
@@ -380,41 +384,44 @@ export const createMockClient = (): EnhancedLinearClient & {
     _team: vi.fn(),
     _getViewer: vi.fn(),
     _cycle: vi.fn(),
-    safeCycle: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<any>>>,
+    safeCycle: vi.fn() as MockedFunction<(id: string) => Promise<LinearResult<unknown>>>,
     _cycles: vi.fn(),
-    safeCycles: vi.fn() as MockedFunction<(filter?: any, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<any>>>,
+    safeCycles: vi.fn() as MockedFunction<(filter?: unknown, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<unknown>>>,
     _createCycle: vi.fn(),
-    safeCreateCycle: vi.fn() as MockedFunction<(input: any) => Promise<LinearResult<any>>>,
+    safeCreateCycle: vi.fn() as MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>,
     _updateCycle: vi.fn(),
-    safeUpdateCycle: vi.fn() as MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>,
+    safeUpdateCycle: vi.fn() as MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>,
     _addIssueToCycle: vi.fn(),
     _createProject: vi.fn(),
-    testAuthentication: vi.fn()
+    testAuthentication: vi.fn(),
+    getPriorityLabel: vi.fn(() => "Medium"),
   } as unknown as EnhancedLinearClient & {
-    safeGetIssue: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-    safeCreateIssue: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-    safeUpdateIssue: MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>;
-    safeIssues: MockedFunction<(filter?: any, first?: number, after?: string) => Promise<LinearResult<any>>>;
-    safeCreateComment: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-    safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<any>>>;
-    safeUpdateComment: MockedFunction<(id: string, input: any) => Promise<LinearResult<any>>>;
-    safeDeleteComment: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-    safeTeam: MockedFunction<(id: string) => Promise<LinearResult<any>>>;
-    safeTeams: MockedFunction<(filter?: any, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<any>>>;
-    safeCreateIssueLabel: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-    safeCreateLabel: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
-    safeGetViewer: MockedFunction<() => Promise<LinearResult<any>>>;
-    safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<any>>>;
-    safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<any>>>;
-    safeAddIssueToCycle: MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<any>>>;
-    safeCreateProject: MockedFunction<(input: any) => Promise<LinearResult<any>>>;
+    safeGetIssue: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+    safeCreateIssue: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+    safeUpdateIssue: MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>;
+    safeIssues: MockedFunction<(filter?: unknown, first?: number, after?: string) => Promise<LinearResult<unknown>>>;
+    safeCreateComment: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+    safeGetComment: MockedFunction<(issueId: string, commentId: string) => Promise<LinearResult<unknown>>>;
+    safeUpdateComment: MockedFunction<(id: string, input: unknown) => Promise<LinearResult<unknown>>>;
+    safeDeleteComment: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+    safeTeam: MockedFunction<(id: string) => Promise<LinearResult<unknown>>>;
+    safeTeams: MockedFunction<(filter?: unknown, first?: number, after?: string, includeArchived?: boolean) => Promise<LinearResult<unknown>>>;
+    safeCreateIssueLabel: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+    safeCreateLabel: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
+    safeGetViewer: MockedFunction<() => Promise<LinearResult<unknown>>>;
+    safeApplyLabels: MockedFunction<(issueId: string, labelIds: string[]) => Promise<LinearResult<unknown>>>;
+    safeAssignIssueToProject: MockedFunction<(issueId: string, projectId: string) => Promise<LinearResult<unknown>>>;
+    safeAddIssueToCycle: MockedFunction<(issueId: string, cycleId: string) => Promise<LinearResult<unknown>>>;
+    safeCreateProject: MockedFunction<(input: unknown) => Promise<LinearResult<unknown>>>;
   };
 };
 
 // Helper functions for setting up common mocks
-export const setupCommonMocks = (mockClient: any) => {
-  mockClient.safeTeam.mockResolvedValue(mockApiResponses.mockGetTeam());
-  mockClient.safeTeams.mockResolvedValue(mockApiResponses.mockGetTeams());
+export const setupCommonMocks = (mockClient: unknown) => {
+  if (mockClient && typeof mockClient === 'object' && 'safeTeam' in mockClient && 'safeTeams' in mockClient) {
+    (mockClient as { safeTeam: { mockResolvedValue: (value: unknown) => void } }).safeTeam.mockResolvedValue(mockApiResponses.mockGetTeam());
+    (mockClient as { safeTeams: { mockResolvedValue: (value: unknown) => void } }).safeTeams.mockResolvedValue(mockApiResponses.mockGetTeams());
+  }
 };
 
 // Mock the logger
@@ -449,6 +456,6 @@ export const mockUtils = () => {
     normalizeStateName: vi.fn(name => name),
     safeText: vi.fn(text => text || "None"),
     formatDate: vi.fn(date => date ? new Date(date).toISOString() : "None"),
-    getPriorityLabel: vi.fn(priority => "Medium"),
+    getPriorityLabel: vi.fn(() => "Medium"),
   }));
 }; 

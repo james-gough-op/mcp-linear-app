@@ -1,15 +1,14 @@
 import {
-  LinearErrorType
+    LinearErrorType
 } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatErrorResponse } from '../../libs/error-utils.js';
 import { LinearError } from '../../libs/errors.js';
 import { formatSuccessResponse } from '../../libs/response-utils.js';
 import {
-  createMockClient,
-  getResponseText,
-  mockLogger,
-  mockUtils
+    getResponseText,
+    mockLogger,
+    mockUtils
 } from '../utils/test-utils.js';
 
 /**
@@ -24,11 +23,8 @@ mockLogger();
 mockUtils();
 
 describe('Standardized Error Handling Integration Tests', () => {
-  let mockClient: ReturnType<typeof createMockClient>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mockClient = createMockClient();
   });
 
   describe('Authentication Errors', () => {

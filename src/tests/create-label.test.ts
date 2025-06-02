@@ -1,5 +1,6 @@
-import { LinearErrorType } from '@linear/sdk';
+import { IssueLabelPayload, LinearErrorType } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getEnhancedClient } from '../libs/client.js';
 import { LinearError, LinearResult } from '../libs/errors.js';
 import { createLinearCreateLabelTool, LinearCreateLabelTool } from '../tools/linear/create-label.js';
 import { setupMockServer } from './mocks/msw-setup.js';
@@ -23,7 +24,7 @@ vi.mock('../libs/client.js', () => {
 });
 
 describe('LinearCreateLabelTool', () => {
-  let mockClient: any;
+  let mockClient: ReturnType<typeof getEnhancedClient>;
   beforeEach(async () => {
     vi.clearAllMocks();
     const { getEnhancedClient } = await import('../libs/client.js');
@@ -42,7 +43,7 @@ describe('LinearCreateLabelTool', () => {
         }
       },
       error: undefined
-    } as LinearResult<any>);
+    } as unknown as LinearResult<IssueLabelPayload>);
 
     // Call the handler directly
     const response = await LinearCreateLabelTool.handler({
@@ -69,7 +70,7 @@ describe('LinearCreateLabelTool', () => {
         }
       },
       error: undefined
-    } as LinearResult<any>);
+    } as unknown as LinearResult<IssueLabelPayload>);
 
     // Call the handler directly
     const response = await LinearCreateLabelTool.handler({
@@ -101,7 +102,7 @@ describe('LinearCreateLabelTool', () => {
       success: false,
       data: undefined,
       error: new LinearError('API Error: Network failure', LinearErrorType.NetworkError)
-    } as LinearResult<any>);
+    } as unknown as LinearResult<IssueLabelPayload>);
 
     // Call the handler
     const response = await LinearCreateLabelTool.handler({
@@ -124,7 +125,7 @@ describe('LinearCreateLabelTool', () => {
         success: false
       },
       error: undefined
-    } as LinearResult<any>);
+    } as unknown as LinearResult<IssueLabelPayload>);
 
     // Call the handler
     const response = await LinearCreateLabelTool.handler({

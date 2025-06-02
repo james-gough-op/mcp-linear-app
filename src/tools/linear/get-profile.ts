@@ -107,6 +107,7 @@ export function createLinearGetProfileTool(enhancedClient = getEnhancedClient())
             type: "text",
             text: `Success: Profile data retrieved.\n\n${formattedText}`,
           }],
+          isError: false
         };
       } catch (error) {
         logger.error('Unexpected error retrieving profile data', { 

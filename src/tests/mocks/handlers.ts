@@ -16,12 +16,12 @@ import {
 // GraphQL request/response types
 type GraphQLRequest = {
   query: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 };
 
 type GraphQLResponse = {
-  data?: Record<string, any>;
-  errors?: Array<{ message: string; [key: string]: any }>;
+  data?: Record<string, unknown>;
+  errors?: Array<{ message: string; [key: string]: unknown }>;
 };
 
 // Special case mock data

@@ -42,40 +42,40 @@ export interface MockIssue {
   id: string;
   title: string;
   description?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MockComment {
   id: string;
   body: string;
   issueId: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MockTeam {
   id: string;
   name: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MockUser {
   id: string;
   name: string;
   email: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MockLabel {
   id: string;
   name: string;
   color?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MockProject {
   id: string;
   name: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Response shape wrappers

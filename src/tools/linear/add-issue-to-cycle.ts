@@ -1,10 +1,13 @@
+import { LinearErrorType } from '@linear/sdk';
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearError } from '../../libs/errors.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createLogger } from '../../libs/logger.js';
 import { formatSuccessResponse } from '../../libs/response-utils.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
+import { safeText } from "../../libs/utils.js";
 
 // Create a logger specific to this component
 const logger = createLogger('AddIssueToCycle');
@@ -94,13 +97,18 @@ export function createLinearAddIssueToCycleTool(enhancedClient = getEnhancedClie
             cycleName
           });
 
-          const details = `issue \"${updatedIssue.title}\" (${identifier}) to cycle ${cycleNumber ? `#${cycleNumber} ` : ''}\"${cycleName}\" (ID: ${validatedArgs.cycleId})`;
+          const details = `issue ${safeText(updatedIssue.title)} (${identifier}) to cycle ${cycleNumber ? `#${cycleNumber} ` : ''}${cycleName} (ID: ${validatedArgs.cycleId})`;
           return formatSuccessResponse("added", "issue to cycle", details);
         }
 
         // Handle cases where the operation reports success but data structure is unexpected
         logger.warn('Unexpected response structure', { response: issueUpdatePayload });
-        return formatErrorResponse(new Error('Failed to add issue to cycle. The operation may not have succeeded on Linear\'s side.') as any);
+        return formatErrorResponse(
+          new LinearError(
+            "Failed to add issue to cycle. The operation may not have succeeded on Linear's side.",
+            "Unknown" as LinearErrorType
+          )
+        );
       } catch (error) {
         logger.error('Unexpected error adding issue to cycle', {
           error: error instanceof Error ? error.message : 'Unknown error',

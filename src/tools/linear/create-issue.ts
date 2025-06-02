@@ -1,7 +1,8 @@
-import { LinearDocument } from "@linear/sdk";
+import { LinearDocument, LinearErrorType } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearError } from '../../libs/errors.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createLogger } from '../../libs/logger.js';
 import { formatSuccessResponse } from '../../libs/response-utils.js';
@@ -45,15 +46,13 @@ const createIssueSchema = z.object({
   templateId: LinearIdSchema.optional().describe("The ID of the template to use for the issue")
 });
 
-type ValidatedIssueInput = z.infer<typeof createIssueSchema>;
-
 // Factory to create the tool with a provided client (for DI/testing)
 export function createLinearCreateIssueTool(enhancedClient = getEnhancedClient()) {
   return createSafeTool({
     name: "create_issue",
     description: "A tool that creates an issue in Linear",
     schema: createIssueSchema.shape,
-    handler: async (args, options) => {
+    handler: async (args) => {
       try {
         // Zod validation
         const parseResult = createIssueSchema.safeParse(args);
@@ -131,9 +130,9 @@ export function createLinearCreateIssueTool(enhancedClient = getEnhancedClient()
         // Check for error messages on both top-level and nested data.error
         let nestedErrorMsg = '';
         if (createIssueResult.data && typeof createIssueResult.data === 'object' && 'error' in createIssueResult.data) {
-          const err = (createIssueResult.data as any).error;
-          if (err && typeof err === 'object' && 'message' in err) {
-            nestedErrorMsg = err.message;
+          const errObj = (createIssueResult.data as { error?: { message?: string } }).error;
+          if (errObj && typeof errObj === 'object' && 'message' in errObj) {
+            nestedErrorMsg = errObj.message ?? '';
           }
         }
         const errorMsg = createIssueResult.error?.message || nestedErrorMsg || '';
@@ -144,16 +143,14 @@ export function createLinearCreateIssueTool(enhancedClient = getEnhancedClient()
           if (errorMsg.includes('Title is required')) {
             return formatValidationError('title', 'Issue title cannot be empty', true);
           }
-          return formatErrorResponse(createIssueResult.error);
-        }
-        // Handle error if not successful or data missing
-        if (!createIssueResult.success || !createIssueResult.data) {
-          return formatErrorResponse(createIssueResult.error);
+          return formatErrorResponse(new LinearError(errorMsg, "Unknown" as LinearErrorType));
         }
         if (createIssueResult.success) {
           const payload = createIssueResult.data;
           if (typeof payload !== 'object' || payload === null) {
-            return formatErrorResponse(new Error('Issue creation response missing data.') as any);
+            return formatErrorResponse(
+              new LinearError('Issue creation response missing data.', "Unknown" as LinearErrorType)
+            );
           }
           if (payload && payload.issue) {
             // Get the issue data - need to await it since SDK returns a promise
@@ -174,7 +171,9 @@ export function createLinearCreateIssueTool(enhancedClient = getEnhancedClient()
                 if (issueErrorMsg.includes('Title is required')) {
                   return formatValidationError('title', 'Issue title cannot be empty');
                 }
-                return formatErrorResponse(new Error(issueErrorMsg) as any);
+                return formatErrorResponse(
+                  new LinearError(issueErrorMsg, "Unknown" as LinearErrorType)
+                );
               }
             }
             logger.info('Issue created successfully', { 
@@ -193,7 +192,9 @@ export function createLinearCreateIssueTool(enhancedClient = getEnhancedClient()
           }
         }
         // Fallback (should not be reached)
-        return formatErrorResponse(new Error('Unknown handler state.') as any);
+        return formatErrorResponse(
+          new LinearError('Unknown handler state.', "Unknown" as LinearErrorType)
+        );
       } catch (err) {
         logger.error('Unexpected error creating issue', { error: err instanceof Error ? err.message : String(err), ...args });
         return formatCatchErrorResponse(err);

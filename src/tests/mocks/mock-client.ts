@@ -36,7 +36,7 @@ export const mockEnhancedClient = {
 
 // Add an index signature to the type
 type EnhancedClientWithIndexSignature = typeof mockEnhancedClient & {
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 // Setup client mock for testing
@@ -57,8 +57,8 @@ export function resetClientMocks() {
   const clientWithIndex = mockEnhancedClient as EnhancedClientWithIndexSignature;
   
   for (const key in mockEnhancedClient) {
-    if (typeof clientWithIndex[key] === 'function') {
-      clientWithIndex[key].mockReset();
+    if (typeof clientWithIndex[key] === 'function' && 'mockClear' in clientWithIndex[key]) {
+      (clientWithIndex[key] as { mockClear: () => void }).mockClear();
     }
   }
 }

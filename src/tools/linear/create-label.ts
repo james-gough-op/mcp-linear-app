@@ -24,11 +24,6 @@ const createLabelSchema = z.object({
   teamId: LinearIdSchema.optional().describe("Optional team ID for team-specific labels")
 });
 
-/**
- * Type for validated input from Zod schema
- */
-type ValidatedLabelInput = z.infer<typeof createLabelSchema>;
-
 // Factory to create the tool with a provided client (for DI/testing)
 export function createLinearCreateLabelTool(enhancedClient = getEnhancedClient()) {
   return createSafeTool({

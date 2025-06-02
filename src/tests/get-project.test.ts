@@ -26,8 +26,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   
   // Add the methods we need to test with proper type annotations
-  enhancedClient.safeProject = vi.fn() as unknown as SafeProjectFn;
-  enhancedClient.safeProjects = vi.fn() as unknown as SafeProjectsFn;
+  enhancedClient.safeProject = vi.fn() as SafeProjectFn;
+  enhancedClient.safeProjects = vi.fn() as SafeProjectsFn;
   
   // Set up global spies for methods we need to check in all tests
   vi.spyOn(enhancedClient, 'safeExecuteGraphQLQuery');
@@ -37,8 +37,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   
   // Clean up our added methods
-  delete (enhancedClient as any).safeProject;
-  delete (enhancedClient as any).safeProjects;
+  delete (enhancedClient as Partial<typeof enhancedClient>).safeProject;
+  delete (enhancedClient as Partial<typeof enhancedClient>).safeProjects;
 });
 
 describe('enhancedClient.safeProject', () => {
@@ -49,16 +49,16 @@ describe('enhancedClient.safeProject', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(successResponse);
     
     // Mock the safeProject implementation for this test
-    (enhancedClient.safeProject as any).mockImplementation(async (id: string) => {
-      const result = await enhancedClient.safeExecuteGraphQLQuery<{ project: any }>(
+    vi.mocked(enhancedClient.safeProject).mockImplementation(async (id: string) => {
+      const result = await enhancedClient.safeExecuteGraphQLQuery<{ project: unknown }>(
         'query Project { project(id: $id) { id name description } }',
         { id }
       );
       
       if (result.success) {
-        return { success: true, data: result.data?.project };
+        return { success: true, data: (result.data as { project?: LinearDocument.Project })?.project };
       }
-      return result;
+      return { success: false, error: result.error, data: undefined };
     });
     
     // Act
@@ -81,7 +81,7 @@ describe('enhancedClient.safeProject', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(errorResponse);
     
     // Mock the safeProject implementation for this test
-    (enhancedClient.safeProject as any).mockImplementation(async (id: string) => {
+    vi.mocked(enhancedClient.safeProject).mockImplementation(async (id: string) => {
       return enhancedClient.safeExecuteGraphQLQuery(
         'query Project { project(id: $id) { id name description } }',
         { id }
@@ -102,19 +102,8 @@ describe('enhancedClient.safeProject', () => {
   // Invalid ID case
   it('should validate project ID format', async () => {
     // Arrange
-    (enhancedClient.safeProject as any).mockImplementation(async (id: string) => {
-      // Simulate ID validation
-      if (!id.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
-        return {
-          success: false,
-          error: new LinearError(`Invalid project ID: ${id}`, "InvalidInput" as LinearErrorType)
-        };
-      }
-      
-      return enhancedClient.safeExecuteGraphQLQuery(
-        'query Project { project(id: $id) { id name description } }',
-        { id }
-      );
+    vi.mocked(enhancedClient.safeProject).mockImplementation(async (id: string) => {
+      return { success: false, error: new LinearError(`Invalid project ID: ${id}`, "InvalidInput" as LinearErrorType), data: undefined };
     });
     
     // Act
@@ -136,7 +125,7 @@ describe('enhancedClient.safeProject', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(errorResponse);
     
     // Mock the safeProject implementation for this test
-    (enhancedClient.safeProject as any).mockImplementation(async (id: string) => {
+    vi.mocked(enhancedClient.safeProject).mockImplementation(async (id: string) => {
       return enhancedClient.safeExecuteGraphQLQuery(
         'query Project { project(id: $id) { id name description } }',
         { id }
@@ -173,16 +162,15 @@ describe('enhancedClient.safeProjects', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(successResponse);
     
     // Mock the safeProjects implementation
-    (enhancedClient.safeProjects as any).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
-      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: any }>(
+    vi.mocked(enhancedClient.safeProjects).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
+      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: unknown }>(
         'query Projects { projects(filter: $filter, first: $first, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } }',
         { filter, first, after }
       );
-      
       if (result.success) {
-        return { success: true, data: result.data?.projects };
+        return { success: true, data: (result.data as { projects?: LinearDocument.ProjectConnection })?.projects };
       }
-      return result;
+      return { success: false, error: result.error, data: undefined };
     });
     
     // Act
@@ -212,16 +200,16 @@ describe('enhancedClient.safeProjects', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(successResponse);
     
     // Mock the safeProjects implementation
-    (enhancedClient.safeProjects as any).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
-      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: any }>(
+    vi.mocked(enhancedClient.safeProjects).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
+      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: unknown }>(
         'query Projects { projects(filter: $filter, first: $first, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } }',
         { filter, first, after }
       );
       
       if (result.success) {
-        return { success: true, data: result.data?.projects };
+        return { success: true, data: (result.data as { projects?: LinearDocument.ProjectConnection })?.projects };
       }
-      return result;
+      return { success: false, error: result.error, data: undefined };
     });
     
     // Act
@@ -248,16 +236,16 @@ describe('enhancedClient.safeProjects', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(successResponse);
     
     // Mock the safeProjects implementation
-    (enhancedClient.safeProjects as any).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
-      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: any }>(
+    vi.mocked(enhancedClient.safeProjects).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
+      const result = await enhancedClient.safeExecuteGraphQLQuery<{ projects: unknown }>(
         'query Projects { projects(filter: $filter, first: $first, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } }',
         { filter, first, after }
       );
       
       if (result.success) {
-        return { success: true, data: result.data?.projects };
+        return { success: true, data: (result.data as { projects?: LinearDocument.ProjectConnection })?.projects };
       }
-      return result;
+      return { success: false, error: result.error, data: undefined };
     });
     
     // Act
@@ -279,7 +267,7 @@ describe('enhancedClient.safeProjects', () => {
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(errorResponse);
     
     // Mock the safeProjects implementation
-    (enhancedClient.safeProjects as any).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
+    vi.mocked(enhancedClient.safeProjects).mockImplementation(async (filter?: LinearDocument.ProjectFilter, first: number = 50, after?: string) => {
       return enhancedClient.safeExecuteGraphQLQuery(
         'query Projects { projects(filter: $filter, first: $first, after: $after) { nodes { id name } pageInfo { hasNextPage endCursor } } }',
         { filter, first, after }

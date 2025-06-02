@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import { LinearError } from '../libs/errors.js';
 import {
-    createSuccessResponse,
-    mockApiResponses,
-    mockIssueData,
-    TEST_IDS
+  createSuccessResponse,
+  mockApiResponses,
+  mockIssueData,
+  TEST_IDS
 } from './utils/test-utils.js';
 
 // Helper to create a mock IssueConnection
@@ -44,7 +44,7 @@ describe('enhancedClient._issues', () => {
     const mockIssues = [mockIssueData, { ...mockIssueData, id: 'issue-id-2' }];
     const mockIssuesConnection = createMockIssueConnection(mockIssues);
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    (((enhancedClient.executeGraphQLQuery as unknown) as { mockResolvedValueOnce: (value: { data: { issues: IssueConnection } }) => void })).mockResolvedValueOnce({
       data: { issues: mockIssuesConnection }
     });
     
@@ -53,8 +53,9 @@ describe('enhancedClient._issues', () => {
     };
     
     // Act - mock the internal _issues method since that directly returns IssueConnection
-    vi.spyOn(enhancedClient as any, '_issues').mockResolvedValueOnce(mockIssuesConnection);
-    const result = await (enhancedClient as any)._issues(filter, 50);
+    vi.spyOn(enhancedClient as unknown as { _issues: (filter?: LinearDocument.IssueFilter, first?: number) => Promise<IssueConnection> }, '_issues')
+      .mockResolvedValueOnce(mockIssuesConnection);
+    const result = await (enhancedClient as unknown as { _issues: (filter?: LinearDocument.IssueFilter, first?: number) => Promise<IssueConnection> })._issues(filter, 50);
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -65,13 +66,14 @@ describe('enhancedClient._issues', () => {
     // Arrange
     const mockIssuesConnection = createMockIssueConnection();
     
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    (((enhancedClient.executeGraphQLQuery as unknown) as { mockResolvedValueOnce: (value: { data: { issues: IssueConnection } }) => void })).mockResolvedValueOnce({
       data: { issues: mockIssuesConnection }
     });
     
     // Act - mock the internal _issues method
-    vi.spyOn(enhancedClient as any, '_issues').mockResolvedValueOnce(mockIssuesConnection);
-    const result = await (enhancedClient as any)._issues();
+    vi.spyOn(enhancedClient as unknown as { _issues: (filter?: LinearDocument.IssueFilter, first?: number) => Promise<IssueConnection> }, '_issues')
+      .mockResolvedValueOnce(mockIssuesConnection);
+    const result = await (enhancedClient as unknown as { _issues: (filter?: LinearDocument.IssueFilter, first?: number) => Promise<IssueConnection> })._issues();
     
     // Assert
     expect(result).toEqual(mockIssuesConnection);
@@ -83,27 +85,27 @@ describe('enhancedClient._issues', () => {
     const apiError = new LinearError('API error', LinearErrorType.NetworkError);
     
     // Mock _issues to throw an error
-    vi.spyOn(enhancedClient as any, '_issues').mockRejectedValueOnce(apiError);
+    vi.spyOn(enhancedClient as unknown as { _issues: () => Promise<IssueConnection> }, '_issues')
+      .mockRejectedValueOnce(apiError);
     
     // Act & Assert
-    await expect((enhancedClient as any)._issues()).rejects.toThrow(apiError);
+    await expect((enhancedClient as unknown as { _issues: () => Promise<IssueConnection> })._issues()).rejects.toThrow(apiError);
   });
   
   // Error case - Invalid response format
   it('should throw LinearError when response data is missing', async () => {
     // Arrange
-    (enhancedClient.executeGraphQLQuery as any).mockResolvedValueOnce({
+    (((enhancedClient.executeGraphQLQuery as unknown) as { mockResolvedValueOnce: (value: { data: { issues: IssueConnection } | null }) => void })).mockResolvedValueOnce({
       data: null
     });
     
     // Mock implementation to bypass validation but fail with the expected error
-    vi.spyOn(enhancedClient as any, '_issues').mockRejectedValueOnce(
-      new LinearError('Failed to fetch issues', LinearErrorType.Unknown)
-    );
+    vi.spyOn(enhancedClient as unknown as { _issues: () => Promise<IssueConnection> }, '_issues')
+      .mockRejectedValueOnce(new LinearError('Failed to fetch issues', LinearErrorType.Unknown));
     
     // Act & Assert
-    await expect((enhancedClient as any)._issues()).rejects.toThrow(LinearError);
-    await expect((enhancedClient as any)._issues()).rejects.toThrow('Failed to fetch issues');
+    await expect((enhancedClient as unknown as { _issues: () => Promise<IssueConnection> })._issues()).rejects.toThrow(LinearError);
+    await expect((enhancedClient as unknown as { _issues: () => Promise<IssueConnection> })._issues()).rejects.toThrow('Failed to fetch issues');
   });
 });
 

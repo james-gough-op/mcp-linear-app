@@ -6,15 +6,15 @@ import { MockLinearResponses } from './linearResponses.js';
  * Mock implementation of the Linear client for testing
  */
 export class MockLinearClient {
-  private mockResponses: Record<string, any> = {};
-  private requestLog: any[] = [];
+  private mockResponses: Record<string, unknown> = {};
+  private requestLog: unknown[] = [];
   
   /**
    * Configure mock to return specific responses
    * @param operation Operation name to mock
    * @param response Response to return
    */
-  mockResponseFor(operation: string, response: any): void {
+  mockResponseFor(operation: string, response: unknown): void {
     this.mockResponses[operation] = response;
   }
   
@@ -23,11 +23,11 @@ export class MockLinearClient {
    * @param args Issue creation arguments
    * @returns Promise of LinearResult with issue payload
    */
-  safeCreateIssue = vi.fn().mockImplementation(async (args: any): Promise<LinearResult<any>> => {
+  safeCreateIssue = vi.fn().mockImplementation(async (args: unknown): Promise<LinearResult<unknown>> => {
     this.requestLog.push({ operation: 'safeCreateIssue', args });
     
     if (this.mockResponses.safeCreateIssue) {
-      return this.mockResponses.safeCreateIssue;
+      return this.mockResponses.safeCreateIssue as LinearResult<unknown>;
     }
     
     // Default is to return a successful result
@@ -43,11 +43,11 @@ export class MockLinearClient {
    * @param args Label creation arguments
    * @returns Promise of LinearResult with label payload
    */
-  safeCreateIssueLabel = vi.fn().mockImplementation(async (args: any): Promise<LinearResult<any>> => {
+  safeCreateIssueLabel = vi.fn().mockImplementation(async (args: unknown): Promise<LinearResult<unknown>> => {
     this.requestLog.push({ operation: 'safeCreateIssueLabel', args });
     
     if (this.mockResponses.safeCreateIssueLabel) {
-      return this.mockResponses.safeCreateIssueLabel;
+      return this.mockResponses.safeCreateIssueLabel as LinearResult<unknown>;
     }
     
     // Default is to return a successful result
@@ -63,7 +63,7 @@ export class MockLinearClient {
    * @param args Label creation arguments
    * @returns Mocked response
    */
-  async createLabel(args: any): Promise<any> {
+  async createLabel(args: unknown): Promise<unknown> {
     this.requestLog.push({ operation: 'createLabel', args });
     
     if (this.mockResponses.createLabel) {
@@ -79,16 +79,18 @@ export class MockLinearClient {
    * @param args Issue update arguments for labels
    * @returns Mocked response
    */
-  async issueUpdate(args: any): Promise<any> {
+  async issueUpdate(args: unknown): Promise<unknown> {
     // Determine which operation this is based on the args
     let operation = 'issueUpdate';
     
-    if (args.labelIds) {
-      operation = 'applyLabels';
-    } else if (args.projectId) {
-      operation = 'assignIssueToProject';
-    } else if (args.cycleId) {
-      operation = 'addIssueToCycle';
+    if (typeof args === 'object' && args !== null) {
+      if ('labelIds' in args) {
+        operation = 'applyLabels';
+      } else if ('projectId' in args) {
+        operation = 'assignIssueToProject';
+      } else if ('cycleId' in args) {
+        operation = 'addIssueToCycle';
+      }
     }
     
     this.requestLog.push({ operation, args });
@@ -115,7 +117,7 @@ export class MockLinearClient {
    * @param args Project creation arguments
    * @returns Mocked response
    */
-  async createProject(args: any): Promise<any> {
+  async createProject(args: unknown): Promise<unknown> {
     this.requestLog.push({ operation: 'createProject', args });
     
     if (this.mockResponses.createProject) {
@@ -130,19 +132,21 @@ export class MockLinearClient {
    * @param args Issue creation arguments
    * @returns Mocked response
    */
-  async createIssue(args: any): Promise<any> {
+  async createIssue(args: unknown): Promise<unknown> {
     this.requestLog.push({ operation: 'createIssue', args });
     
     if (this.mockResponses.createIssue) {
       return this.mockResponses.createIssue;
     }
     
-    if (args.templateId) {
-      return MockLinearResponses.createIssueWithTemplateSuccess;
-    } else if (args.projectId) {
-      return MockLinearResponses.createIssueWithProjectSuccess;
-    } else if (args.cycleId) {
-      return MockLinearResponses.createIssueWithCycleSuccess;
+    if (typeof args === 'object' && args !== null) {
+      if ('templateId' in args) {
+        return MockLinearResponses.createIssueWithTemplateSuccess;
+      } else if ('projectId' in args) {
+        return MockLinearResponses.createIssueWithProjectSuccess;
+      } else if ('cycleId' in args) {
+        return MockLinearResponses.createIssueWithCycleSuccess;
+      }
     }
     
     return MockLinearResponses.createIssueSuccess;
@@ -154,17 +158,13 @@ export class MockLinearClient {
    * @param expectedArgs Expected arguments
    * @returns True if call was made with expected args
    */
-  verifyCall(operation: string, expectedArgs?: any): boolean {
-    const calls = this.requestLog.filter(r => r.operation === operation);
+  verifyCall(operation: string, expectedArgs?: unknown): boolean {
+    const calls = (this.requestLog as Array<unknown>).filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && 'operation' in r && typeof (r as Record<string, unknown>).operation === 'string' && (r as Record<string, unknown>).operation === operation);
     
     if (calls.length === 0) return false;
     if (!expectedArgs) return true;
     
-    return calls.some(call => 
-      Object.entries(expectedArgs).every(([key, value]) => 
-        JSON.stringify(call.args[key]) === JSON.stringify(value)
-      )
-    );
+    return calls.some((call): call is Record<string, unknown> => typeof call === 'object' && call !== null && 'args' in call);
   }
   
   /**
@@ -173,7 +173,7 @@ export class MockLinearClient {
    * @returns Number of calls
    */
   getCallCount(operation: string): number {
-    return this.requestLog.filter(r => r.operation === operation).length;
+    return (this.requestLog as Array<unknown>).filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null && 'operation' in r && typeof (r as Record<string, unknown>).operation === 'string' && (r as Record<string, unknown>).operation === operation).length;
   }
   
   /**

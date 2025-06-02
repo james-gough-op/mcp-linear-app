@@ -1,7 +1,8 @@
-import { Comment as LinearComment, User as LinearUser } from "@linear/sdk";
+import { Issue, Comment as LinearComment, User as LinearUser } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearResult } from '../../libs/errors.js';
 import { createLogger } from '../../libs/logger.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { formatDate, safeText } from '../../libs/utils.js';
@@ -68,7 +69,7 @@ function formatCommentsToHumanReadable(comments: FormattedComment[]): string {
 
 // Factory to create the tool with a provided client (for DI/testing)
 interface HasSafeGetIssue {
-  safeGetIssue: (id: string) => Promise<any>;
+  safeGetIssue: (id: string) => Promise<LinearResult<Issue>>;
 }
 export function createLinearGetCommentTool(enhancedClient: HasSafeGetIssue = getEnhancedClient()) {
   return createSafeTool({

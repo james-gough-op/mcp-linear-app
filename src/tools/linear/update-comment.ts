@@ -20,8 +20,6 @@ const updateCommentSchema = baseCommentSchema.refine(data => data.delete || (typ
     path: ["comment"],
 });
 
-type ValidatedCommentInput = z.infer<typeof updateCommentSchema>;
-
 export function createLinearUpdateCommentTool(enhancedClient = getEnhancedClient()) {
   return createSafeTool({
     name: "update_comment",

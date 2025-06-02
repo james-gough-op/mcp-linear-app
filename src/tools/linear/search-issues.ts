@@ -27,8 +27,6 @@ const searchIssuesSchema = z.object({
   keyword: z.string().optional().describe("Filter by keyword in title/description"),
 });
 
-type ValidatedSearchInput = z.infer<typeof searchIssuesSchema>;
-
 /**
  * Interface for search metadata representing pagination and filter details
  * This is not an SDK type - it's a custom interface specific to the search tool

@@ -1,23 +1,23 @@
-import { LinearDocument, LinearErrorType } from '@linear/sdk';
+import { CommentPayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getEnhancedClient } from '../libs/client.js';
 import { createErrorResult, createSuccessResult, LinearError } from '../libs/errors.js';
 import { createLinearUpdateCommentTool } from '../tools/linear/update-comment.js';
 import {
-    createMockClient,
-    createSuccessResponse,
-    expectErrorResponse,
-    expectSuccessResponse,
-    mockApiResponses,
-    mockIssueData,
-    mockUserData,
-    TEST_IDS
+  createMockClient,
+  createSuccessResponse,
+  expectErrorResponse,
+  expectSuccessResponse,
+  mockApiResponses,
+  mockIssueData,
+  mockUserData,
+  TEST_IDS
 } from './utils/test-utils.js';
 
 const enhancedClient = getEnhancedClient();
 
 // Helper to create a mock comment response
-function createMockCommentResponse(): any {
+function createMockCommentResponse(): Record<string, unknown> {
   return {
     success: true,
     comment: {
@@ -57,7 +57,7 @@ describe('enhancedClient.safeUpdateComment', () => {
     
     // Directly mock the safeUpdateComment method
     vi.spyOn(enhancedClient, 'safeUpdateComment').mockResolvedValueOnce(
-      createSuccessResult(mockPayload)
+      createSuccessResult(mockPayload as unknown as CommentPayload)
     );
     
     // Act

@@ -1,11 +1,13 @@
-import { LinearDocument } from "@linear/sdk";
+import { LinearDocument, LinearErrorType } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearError } from '../../libs/errors.js';
 import { LinearIdSchema } from '../../libs/id-management.js';
 import { createLogger } from '../../libs/logger.js';
 import { formatSuccessResponse } from '../../libs/response-utils.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
+import { safeText } from "../../libs/utils.js";
 
 // Create a logger specific to this component
 const logger = createLogger('AssignIssueToProject');
@@ -96,12 +98,17 @@ export function createLinearAssignIssueToProjectTool(enhancedClient = getEnhance
             projectName
           });
           
-          const details = `issue \"${updatedIssue.title}\" (${updatedIssue.identifier}) to project \"${projectName}\" (ID: ${validatedArgs.projectId})`;
+          const details = `issue ${safeText(updatedIssue.title)} (${updatedIssue.identifier}) to project ${safeText(projectName)} (ID: ${validatedArgs.projectId})`;
           return formatSuccessResponse("assigned", "issue to project", details);
         }
         
         logger.warn('Unexpected response structure', { response: issueUpdatePayload });
-        return formatErrorResponse(new Error('Failed to assign issue to project. The operation may not have succeeded on Linear\'s side.') as any);
+        return formatErrorResponse(
+          new LinearError(
+            "Failed to assign issue to project. The operation may not have succeeded on Linear's side.",
+            "Unknown" as LinearErrorType
+          )
+        );
       } catch (error) {
         logger.error('Unexpected error assigning issue to project', {
           error: error instanceof Error ? error.message : 'Unknown error',
