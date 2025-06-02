@@ -1,7 +1,16 @@
+import { LinearErrorType } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLinearAssignIssueToProjectTool, LinearAssignIssueToProjectTool } from '../tools/linear/assign-issue-to-project.js';
+import {
+    createMockClient,
+    expectErrorResponse,
+    expectSuccessResponse,
+    INVALID_IDS,
+    mockApiResponses,
+    TEST_IDS
+} from './utils/test-utils.js';
 
-// Mock Linear API responses
+// For the non-DI pattern tests, we need to mock the client module
 vi.mock('../libs/client.js', () => {
   const mockClient = { safeUpdateIssue: vi.fn() };
   return {
@@ -9,53 +18,45 @@ vi.mock('../libs/client.js', () => {
   };
 });
 
-// Mock UUIDs for testing
-const MOCK_ISSUE_ID = '123e4567-e89b-42d3-a456-556642440000';
-const MOCK_PROJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-
 describe('LinearAssignIssueToProjectTool', () => {
   it('should validate issue ID format', async () => {
     // Call the handler with invalid issue ID
     const response = await LinearAssignIssueToProjectTool.handler({
-      issueId: "invalid-id",
-      projectId: MOCK_PROJECT_ID
+      issueId: INVALID_IDS.ISSUE,
+      projectId: TEST_IDS.PROJECT
     }, { signal: new AbortController().signal });
 
-    // Verify error message
-    expect(response.content).toBeDefined();
-    expect(response.content.length).toBe(1);
+    expectErrorResponse(response, 'invalid');
     expect(response.content[0].text).toContain('Invalid Linear ID format');
   });
 
   it('should validate project ID format', async () => {
     // Call the handler with invalid project ID
     const response = await LinearAssignIssueToProjectTool.handler({
-      issueId: MOCK_ISSUE_ID,
-      projectId: "invalid-id"
+      issueId: TEST_IDS.ISSUE,
+      projectId: INVALID_IDS.PROJECT
     }, { signal: new AbortController().signal });
 
-    // Verify error message
-    expect(response.content).toBeDefined();
-    expect(response.content.length).toBe(1);
+    expectErrorResponse(response, 'invalid');
     expect(response.content[0].text).toContain('Invalid Linear ID format');
   });
 
   it('should successfully assign an issue to a project', async () => {
-    // Mock successful response from Linear API
+    // Create a mock issue with project info
+    const mockIssue = {
+      id: TEST_IDS.ISSUE,
+      identifier: "TEST-123",
+      title: "Test issue",
+      project: Promise.resolve({
+        id: TEST_IDS.PROJECT,
+        name: "Test Project"
+      })
+    };
+
+    // Mock successful response with type casting to avoid type errors
     const mockResponse = {
       success: true,
-      data: {
-        success: true,
-        issue: Promise.resolve({
-          id: MOCK_ISSUE_ID,
-          identifier: "TEST-123",
-          title: "Test issue",
-          project: Promise.resolve({
-            id: MOCK_PROJECT_ID,
-            name: "Test Project"
-          })
-        })
-      }
+      data: { success: true, issue: Promise.resolve(mockIssue) }
     } as any;
     
     // Get the mockClient from the mocked module
@@ -65,30 +66,25 @@ describe('LinearAssignIssueToProjectTool', () => {
     
     // Call the handler with valid parameters
     const response = await LinearAssignIssueToProjectTool.handler({
-      issueId: MOCK_ISSUE_ID,
-      projectId: MOCK_PROJECT_ID
+      issueId: TEST_IDS.ISSUE,
+      projectId: TEST_IDS.PROJECT
     }, { signal: new AbortController().signal });
     
     // Verify the mutation was called with correct parameters
     expect(mockClient.safeUpdateIssue).toHaveBeenCalledWith(
-      MOCK_ISSUE_ID,
-      { projectId: MOCK_PROJECT_ID }
+      TEST_IDS.ISSUE,
+      { projectId: TEST_IDS.PROJECT }
     );
     
     // Verify success response
-    expect(response.content).toBeDefined();
-    expect(response.content.length).toBe(1);
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('Success: issue to project assigned');
     expect(response.content[0].text).toContain('TEST-123');
   });
 
   it('should handle failed API responses', async () => {
     // Mock failed response from Linear API
-    const mockResponse = {
-      success: false,
-      data: undefined,
-      error: { message: 'Failed to assign' }
-    } as any;
+    const mockResponse = mockApiResponses.mockErrorResponse('Failed to assign', LinearErrorType.Unknown);
     
     // Get the mockClient from the mocked module
     const { getEnhancedClient } = await import('../libs/client.js');
@@ -97,40 +93,45 @@ describe('LinearAssignIssueToProjectTool', () => {
     
     // Call the handler with valid parameters
     const response = await LinearAssignIssueToProjectTool.handler({
-      issueId: MOCK_ISSUE_ID,
-      projectId: MOCK_PROJECT_ID
+      issueId: TEST_IDS.ISSUE,
+      projectId: TEST_IDS.PROJECT
     }, { signal: new AbortController().signal });
     
     // Verify failure response
-    expect(response.content).toBeDefined();
-    expect(response.content.length).toBe(1);
+    expectErrorResponse(response, 'error');
     expect(response.content[0].text).toContain('Failed to assign');
     expect(response.content[0].text).toContain('Please try again later');
   });
 });
 
 describe('LinearAssignIssueToProjectTool (DI pattern)', () => {
-  let mockClient: any;
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    mockClient = {
-      safeUpdateIssue: vi.fn()
-    };
+    mockClient = createMockClient();
   });
 
   it('should successfully assign an issue to a project', async () => {
     const mockIssue = {
-      id: MOCK_ISSUE_ID,
+      id: TEST_IDS.ISSUE,
       identifier: 'TEST-123',
       title: 'Test issue',
-      project: Promise.resolve({ id: MOCK_PROJECT_ID, name: 'Test Project' })
+      project: Promise.resolve({ id: TEST_IDS.PROJECT, name: 'Test Project' })
     };
+    
+    // Use type casting to avoid type errors with the mock response
     mockClient.safeUpdateIssue.mockResolvedValueOnce({
       success: true,
       data: { success: true, issue: Promise.resolve(mockIssue) }
-    });
+    } as any);
+    
     const tool = createLinearAssignIssueToProjectTool(mockClient);
-    const response = await tool.handler({ issueId: MOCK_ISSUE_ID, projectId: MOCK_PROJECT_ID }, { signal: new AbortController().signal });
+    const response = await tool.handler(
+      { issueId: TEST_IDS.ISSUE, projectId: TEST_IDS.PROJECT }, 
+      { signal: new AbortController().signal }
+    );
+    
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('assigned');
     expect(response.content[0].text).toContain('Test issue');
     expect(response.content[0].text).toContain('Test Project');
@@ -138,9 +139,17 @@ describe('LinearAssignIssueToProjectTool (DI pattern)', () => {
   });
 
   it('should handle failed API responses', async () => {
-    mockClient.safeUpdateIssue.mockResolvedValueOnce({ success: false, error: { message: 'Failed to assign' } });
+    mockClient.safeUpdateIssue.mockResolvedValueOnce(
+      mockApiResponses.mockErrorResponse('Failed to assign', LinearErrorType.Unknown)
+    );
+    
     const tool = createLinearAssignIssueToProjectTool(mockClient);
-    const response = await tool.handler({ issueId: MOCK_ISSUE_ID, projectId: MOCK_PROJECT_ID }, { signal: new AbortController().signal });
+    const response = await tool.handler(
+      { issueId: TEST_IDS.ISSUE, projectId: TEST_IDS.PROJECT }, 
+      { signal: new AbortController().signal }
+    );
+    
+    expectErrorResponse(response, 'error');
     expect(response.content[0].text).toContain('Failed to assign');
     expect(response.content[0].text).toContain('Please try again later');
   });

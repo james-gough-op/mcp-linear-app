@@ -1,69 +1,44 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LinearErrorType } from '@linear/sdk';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createLinearAddIssueToCycleTool } from '../tools/linear/add-issue-to-cycle.js';
+import {
+  createMockClient,
+  createSuccessResponse,
+  expectErrorResponse,
+  expectSuccessResponse,
+  mockApiResponses,
+  TEST_IDS
+} from './utils/test-utils.js';
 
-// Mock UUIDs for testing
-const MOCK_ISSUE_ID = '550e8400-e29b-41d4-a716-446655440000';
-const MOCK_CYCLE_ID = '7f8e9d0c-1b2a-43c4-a716-446655440000';
-const INVALID_ID = 'not-a-valid-uuid';
-
-// Setup mocks
-vi.mock('../libs/client.js', () => {
-  const mockClient = { executeGraphQLMutation: vi.fn() };
-  return {
-    getEnhancedClient: () => mockClient
-  };
-});
-
-// Sample successful response
-const successResponse = {
-  data: {
-    issueUpdate: {
-      success: true,
-      issue: {
-        id: MOCK_ISSUE_ID,
-        identifier: 'ENG-123',
-        title: 'Test Issue',
-        cycle: {
-          id: MOCK_CYCLE_ID,
-          name: 'Sprint 42',
-          number: 42
-        }
-      }
-    }
-  }
-};
-
-// Sample failed response
-const failedResponse = {
-  data: {
-    issueUpdate: {
-      success: false
-    }
-  }
-};
-
-describe('LinearAddIssueToCycleTool (DI pattern)', () => {
-  let mockClient: any;
+describe('LinearAddIssueToCycleTool', () => {
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    mockClient = {
-      safeAddIssueToCycle: vi.fn()
-    };
+    mockClient = createMockClient();
   });
 
   it('should successfully add an issue to a cycle', async () => {
     const mockIssue = {
-      id: MOCK_ISSUE_ID,
+      id: TEST_IDS.ISSUE,
       identifier: 'ENG-123',
       title: 'Test Issue',
-      cycle: Promise.resolve({ id: MOCK_CYCLE_ID, name: 'Sprint 42', number: 42 })
+      cycle: Promise.resolve({ id: TEST_IDS.CYCLE, name: 'Sprint 42', number: 42 })
     };
-    mockClient.safeAddIssueToCycle.mockResolvedValueOnce({
-      success: true,
-      data: { success: true, issue: Promise.resolve(mockIssue) }
-    });
+    
+    mockClient.safeAddIssueToCycle.mockResolvedValueOnce(
+      createSuccessResponse({ 
+        success: true, 
+        issue: Promise.resolve(mockIssue) 
+      })
+    );
+    
     const tool = createLinearAddIssueToCycleTool(mockClient);
-    const response = await tool.handler({ issueId: MOCK_ISSUE_ID, cycleId: MOCK_CYCLE_ID }, { signal: new AbortController().signal });
+    const response = await tool.handler({ 
+      issueId: TEST_IDS.ISSUE, 
+      cycleId: TEST_IDS.CYCLE 
+    }, { signal: new AbortController().signal });
+    
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('Success: issue to cycle added');
     expect(response.content[0].text).toContain('ENG-123');
     expect(response.content[0].text).toContain('Sprint 42');
@@ -72,10 +47,17 @@ describe('LinearAddIssueToCycleTool (DI pattern)', () => {
   });
 
   it('should handle failed update from Linear API', async () => {
-    mockClient.safeAddIssueToCycle.mockResolvedValueOnce({ success: false, error: { message: 'Failed to add' } });
+    mockClient.safeAddIssueToCycle.mockResolvedValueOnce(
+      mockApiResponses.mockErrorResponse('Failed to add', LinearErrorType.FeatureNotAccessible)
+    );
+    
     const tool = createLinearAddIssueToCycleTool(mockClient);
-    const response = await tool.handler({ issueId: MOCK_ISSUE_ID, cycleId: MOCK_CYCLE_ID }, { signal: new AbortController().signal });
+    const response = await tool.handler({ 
+      issueId: TEST_IDS.ISSUE, 
+      cycleId: TEST_IDS.CYCLE 
+    }, { signal: new AbortController().signal });
+    
+    expectErrorResponse(response, 'failed');
     expect(response.content[0].text).toContain('Failed to add');
-    expect(response.content[0].text).toContain('Error');
   });
 }); 

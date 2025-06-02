@@ -11,6 +11,7 @@ import {
     validateLinearIds,
     validateTeamId
 } from '../libs/id-management.js';
+import { INVALID_IDS, TEST_IDS } from './utils/test-utils.js';
 
 /**
  * Tests for Linear ID Management
@@ -23,9 +24,9 @@ describe('Linear ID Management', () => {
     it('should match valid UUID v4 formats', () => {
       // Valid UUID v4 formats
       const validIds = [
-        '123e4567-e89b-42d3-a456-556642440000',
-        'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-        '550e8400-e29b-41d4-a716-446655440000'
+        TEST_IDS.TEAM,
+        TEST_IDS.ISSUE,
+        TEST_IDS.PROJECT
       ];
       
       for (const id of validIds) {
@@ -37,7 +38,9 @@ describe('Linear ID Management', () => {
       // Invalid formats
       const invalidIds = [
         '', // empty
-        'not-a-uuid',
+        INVALID_IDS.TEAM,
+        INVALID_IDS.ISSUE,
+        INVALID_IDS.PROJECT,
         '123e4567-e89b-12d3-a456-556642440000', // not v4 (wrong middle digit)
         '123e4567-e89b-42d3-7456-556642440000', // not v4 (wrong variant)
         '123e4567-e89b-42d3-a456-55664244000Z' // not hex
@@ -52,7 +55,7 @@ describe('Linear ID Management', () => {
   describe('ID Schema Validation', () => {
     it('should validate correct UUIDs', () => {
       // Valid UUID v4
-      const validId = '123e4567-e89b-42d3-a456-556642440000';
+      const validId = TEST_IDS.TEAM;
       const validResult = LinearIdSchema.safeParse(validId);
       
       expect(validResult.success).toBe(true);
@@ -60,7 +63,7 @@ describe('Linear ID Management', () => {
     
     it('should reject invalid UUIDs', () => {
       // Invalid formats
-      const invalidId = 'not-a-uuid';
+      const invalidId = INVALID_IDS.TEAM;
       const invalidResult = LinearIdSchema.safeParse(invalidId);
       
       expect(invalidResult.success).toBe(false);
@@ -70,7 +73,7 @@ describe('Linear ID Management', () => {
   describe('ValidateLinearId Function', () => {
     it('should accept valid UUIDs', () => {
       // Valid UUID v4
-      const validId = '123e4567-e89b-42d3-a456-556642440000';
+      const validId = TEST_IDS.TEAM;
       
       expect(() => {
         validateLinearId(validId, LinearEntityType.TEAM);
@@ -79,7 +82,7 @@ describe('Linear ID Management', () => {
     
     it('should throw for invalid UUIDs', () => {
       // Invalid ID
-      const invalidId = 'not-a-uuid';
+      const invalidId = INVALID_IDS.TEAM;
       
       expect(() => {
         validateLinearId(invalidId, LinearEntityType.TEAM);
@@ -98,7 +101,7 @@ describe('Linear ID Management', () => {
   describe('Specialized Validators', () => {
     it('should validate team IDs correctly', () => {
       // Valid UUID v4
-      const validId = '123e4567-e89b-42d3-a456-556642440000';
+      const validId = TEST_IDS.TEAM;
       
       expect(() => {
         validateTeamId(validId);
@@ -115,9 +118,9 @@ describe('Linear ID Management', () => {
     it('should validate multiple IDs and return errors for invalid ones', () => {
       // Mix of valid and invalid IDs
       const ids = {
-        team: { id: '123e4567-e89b-42d3-a456-556642440000', entityType: LinearEntityType.TEAM },
-        project: { id: 'not-a-uuid', entityType: LinearEntityType.PROJECT },
-        issue: { id: '550e8400-e29b-41d4-a716-446655440000', entityType: LinearEntityType.ISSUE }
+        team: { id: TEST_IDS.TEAM, entityType: LinearEntityType.TEAM },
+        project: { id: INVALID_IDS.PROJECT, entityType: LinearEntityType.PROJECT },
+        issue: { id: TEST_IDS.ISSUE, entityType: LinearEntityType.ISSUE }
       };
       
       const errors = validateLinearIds(ids);
@@ -131,26 +134,40 @@ describe('Linear ID Management', () => {
     it('should validate correct issue creation data', () => {
       // Valid issue creation data
       const validIssueData = {
-        teamId: '123e4567-e89b-42d3-a456-556642440000',
+        teamId: TEST_IDS.TEAM,
         title: 'Test issue',
         description: 'Test description',
-        assigneeId: '550e8400-e29b-41d4-a716-446655440000',
-        projectId: '123e4567-e89b-42d3-a456-556642440000',
+        assigneeId: '11112222-3333-4444-a555-666677778888', // Valid UUID for user
+        projectId: TEST_IDS.PROJECT,
       };
       
       const validResult = CreateIssueSchema.safeParse(validIssueData);
+      
+      if (!validResult.success) {
+        // Log detailed error information for debugging
+        console.error('Validation errors:', JSON.stringify(validResult.error.format(), null, 2));
+      }
+      
       expect(validResult.success).toBe(true);
     });
     
     it('should reject issue data with invalid IDs', () => {
       // Invalid issue creation data (invalid team ID)
       const invalidIssueData = {
-        teamId: 'not-a-uuid',
+        teamId: INVALID_IDS.TEAM,
         title: 'Test issue',
       };
       
       const invalidResult = CreateIssueSchema.safeParse(invalidIssueData);
       expect(invalidResult.success).toBe(false);
+      
+      if (!invalidResult.success) {
+        // Verify we got the expected error for the team ID
+        const errors = invalidResult.error.format();
+        expect(errors.teamId?._errors).toBeDefined();
+        expect(errors.teamId?._errors.length).toBeGreaterThan(0);
+        expect(errors.teamId?._errors[0]).toContain('Invalid Linear ID format');
+      }
     });
   });
 }); 

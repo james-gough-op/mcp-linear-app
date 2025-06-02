@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import { LinearError } from '../libs/errors.js';
 import {
-    createMockIssue,
-    MOCK_IDS
-} from './mocks/mock-data.js';
+    createSuccessResponse,
+    mockIssueData,
+    TEST_IDS
+} from './utils/test-utils.js';
 
 // Setup mocks
 beforeEach(() => {
@@ -25,10 +26,9 @@ describe('enhancedClient.createIssue', () => {
   // Happy path
   it('should return issue payload for valid input', async () => {
     // Arrange
-    const mockIssue = createMockIssue();
     const mockPayload = {
       success: true,
-      issue: mockIssue
+      issue: mockIssueData
     };
     
     // Store original methods
@@ -36,9 +36,9 @@ describe('enhancedClient.createIssue', () => {
     const originalSafeExecute = enhancedClient.safeExecuteGraphQLMutation;
     
     // Create our own mock functions that avoid type issues
-    const mockSafeExecute = vi.fn().mockResolvedValue({
-      data: { issueCreate: mockPayload }
-    });
+    const mockSafeExecute = vi.fn().mockResolvedValue(
+      createSuccessResponse({ issueCreate: mockPayload })
+    );
     
     // Mock createIssue to properly call mockSafeExecute
     const mockCreateIssueFn = vi.fn().mockImplementation(async (input) => {
@@ -52,7 +52,7 @@ describe('enhancedClient.createIssue', () => {
     enhancedClient.safeCreateIssue = mockCreateIssueFn;
     
     const input = {
-      teamId: MOCK_IDS.TEAM,
+      teamId: TEST_IDS.TEAM,
       title: 'Test Issue'
     };
     
@@ -118,7 +118,7 @@ describe('enhancedClient.createIssue', () => {
     enhancedClient.safeCreateIssue = mockCreateIssueFn;
     
     const input = {
-      teamId: MOCK_IDS.TEAM
+      teamId: TEST_IDS.TEAM
     };
     
     try {
@@ -148,7 +148,7 @@ describe('enhancedClient.createIssue', () => {
     enhancedClient.safeCreateIssue = mockCreateIssueFn;
     
     const input = {
-      teamId: MOCK_IDS.TEAM,
+      teamId: TEST_IDS.TEAM,
       title: 'Test Issue'
     };
     

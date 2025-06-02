@@ -6,7 +6,7 @@ import { LinearError } from '../libs/errors.js';
 describe('Error Utilities', () => {
   describe('formatErrorResponse', () => {
     it('should format a LinearError with authentication error type correctly', () => {
-      const error = new LinearError('API key is invalid', "AuthenticationError" as LinearErrorType);
+      const error = new LinearError('API key is invalid', LinearErrorType.AuthenticationError);
       const response = formatErrorResponse(error);
       
       expect(response).toHaveProperty('content');
@@ -17,7 +17,7 @@ describe('Error Utilities', () => {
     });
     
     it('should format a LinearError with permission error type correctly', () => {
-      const error = new LinearError('No permission to access this resource', "Forbidden" as LinearErrorType);
+      const error = new LinearError('No permission to access this resource', LinearErrorType.Forbidden);
       const response = formatErrorResponse(error);
       
       expect(response.content[0].text).toContain('Permission denied');
@@ -26,7 +26,7 @@ describe('Error Utilities', () => {
     });
     
     it('should format a LinearError with network error type correctly', () => {
-      const error = new LinearError('Connection failed', "NetworkError" as LinearErrorType);
+      const error = new LinearError('Connection failed', LinearErrorType.NetworkError);
       const response = formatErrorResponse(error);
       
       expect(response.content[0].text).toContain('Network error');
@@ -65,7 +65,7 @@ describe('Error Utilities', () => {
   
   describe('formatCatchErrorResponse', () => {
     it('should format a caught LinearError correctly', () => {
-      const error = new LinearError('API key is invalid', "AuthenticationError" as LinearErrorType);
+      const error = new LinearError('API key is invalid', LinearErrorType.AuthenticationError);
       const response = formatCatchErrorResponse(error);
       
       expect(response.content[0].text).toContain('Authentication error');

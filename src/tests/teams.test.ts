@@ -1,21 +1,21 @@
 import { LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearError, createErrorResult, createSuccessResult } from '../libs/errors.js';
-import { MOCK_IDS } from './mocks/mock-data.js';
+import { LinearError } from '../libs/errors.js';
+import {
+    createSuccessResponse,
+    mockApiResponses,
+    mockTeamData,
+    TEST_IDS
+} from './utils/test-utils.js';
 
-// Helper to create a mock teams response
+// Helper to create a mock teams connection
 function createMockTeamsConnection(): LinearDocument.TeamConnection {
   return {
     nodes: [
       {
-        id: MOCK_IDS.TEAM,
-        name: 'Test Team',
-        key: 'TST',
-        description: 'Test team description',
-        color: '#FF5500',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        ...mockTeamData,
+        id: TEST_IDS.TEAM
       }
     ],
     pageInfo: {
@@ -47,7 +47,7 @@ describe('enhancedClient.safeTeams', () => {
     const mockTeams = createMockTeamsConnection();
     
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
-      createSuccessResult({ teams: mockTeams })
+      createSuccessResponse({ teams: mockTeams })
     );
     
     // Act
@@ -72,7 +72,7 @@ describe('enhancedClient.safeTeams', () => {
     };
     
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
-      createSuccessResult({ teams: mockTeams })
+      createSuccessResponse({ teams: mockTeams })
     );
     
     // Act
@@ -90,9 +90,8 @@ describe('enhancedClient.safeTeams', () => {
   // Error from API
   it('should handle API errors gracefully', async () => {
     // Arrange
-    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
     vi.mocked(enhancedClient.safeExecuteGraphQLQuery).mockResolvedValueOnce(
-      createErrorResult(apiError)
+      mockApiResponses.mockErrorResponse('API error', LinearErrorType.NetworkError)
     );
     
     // Act
@@ -100,7 +99,9 @@ describe('enhancedClient.safeTeams', () => {
     
     // Assert
     expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.NetworkError);
+    expect(result.error?.message).toContain('API error');
     expect(enhancedClient.safeExecuteGraphQLQuery).toHaveBeenCalledTimes(1);
   });
 }); 

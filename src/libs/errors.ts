@@ -65,42 +65,42 @@ export class LinearError extends Error {
   get userMessage(): string {
     switch (this.type) {
       case "AuthenticationError" as LinearErrorType:
-        return `Authentication failed. Please check your Linear API key configuration.`;
+        return `Authentication error: Authentication failed. Please check your Linear API key configuration.`;
       
       case "Forbidden" as LinearErrorType:
-        return `Permission denied. Your API key lacks permission for this operation.`;
+        return `Permission denied: Your API key lacks permission for this operation.`;
       
       case "FeatureNotAccessible" as LinearErrorType:
-        return `Resource not found in Linear. Please check the ID or reference is correct.`;
+        return `Not found: Resource not found in Linear. Please check the ID or reference is correct.`;
       
       case "Ratelimited" as LinearErrorType:
-        return `Rate limit exceeded. Please wait ${this.retryAfter || 60} seconds before retrying.`;
+        return `API error: Rate limit exceeded. Please wait ${this.retryAfter || 60} seconds before retrying.`;
       
       case "InvalidInput" as LinearErrorType: 
-        return `Validation error with Linear API request. ${this.message}`;
+        return `Validation error: Invalid input. ${this.message}`;
       
       case "NetworkError" as LinearErrorType:
-        return `Network error when contacting Linear API. Please check your connection.`;
+        return `Network error: Unable to connect to Linear API. Please check your connection.`;
       
       case "UserError" as LinearErrorType:
-        return `User error with Linear API request. ${this.message}`;
+        return `Validation error: Invalid input. ${this.message}`;
 
       case "InternalError" as LinearErrorType:
-        return `Internal error with Linear API. Please contact support.`;
+        return `API error: Internal error with Linear API. Please contact support.`;
       
       case "GraphqlError" as LinearErrorType:
-        return `GraphQL error with Linear API request. ${this.message}`;
+        return `API error: GraphQL error with Linear API request. ${this.message}`;
       
       case "LockTimeout" as LinearErrorType:
-        return `Lock timeout with Linear API request. Please try again later.`;
+        return `API error: Lock timeout with Linear API request. Please try again later.`;
       
       case "BootstrapError" as LinearErrorType:
-        return `Bootstrap error with Linear API. Please contact support.`;
+        return `API error: Bootstrap error with Linear API. Please contact support.`;
       
       case "Unknown" as LinearErrorType:
       case "Other" as LinearErrorType:
       default:
-        return `An error occurred with the Linear API: ${this.message}`;
+        return `Unexpected error: An error occurred with the Linear API: ${this.message}`;
     }
   }
   

@@ -1,5 +1,13 @@
-import { beforeEach, describe, expect, it, Mock, vi } from 'vitest';
+import { LinearErrorType } from '@linear/sdk';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createLinearGetProfileTool } from '../tools/linear/get-profile.js';
+import {
+    createMockClient,
+    createSuccessResponse,
+    expectErrorResponse,
+    expectSuccessResponse,
+    mockApiResponses
+} from './utils/test-utils.js';
 
 // Mock data for testing
 const mockProfile = {
@@ -17,29 +25,22 @@ const mockProfile = {
   url: 'https://linear.app/test/user',
 };
 
-interface MockLinearClient {
-  safeGetViewer: Mock;
-}
-
-// Use any type to avoid TypeScript errors related to the enhanced client interface
-describe('LinearGetProfileTool (DI pattern)', () => {
-  let mockClient: MockLinearClient;
+describe('LinearGetProfileTool', () => {
+  let mockClient: ReturnType<typeof createMockClient>;
 
   beforeEach(() => {
-    mockClient = {
-      safeGetViewer: vi.fn(),
-    };
+    mockClient = createMockClient();
   });
 
   it('should return formatted profile details on success', async () => {
-    mockClient.safeGetViewer.mockResolvedValueOnce({
-      success: true,
-      data: mockProfile,
-    });
+    mockClient.safeGetViewer.mockResolvedValueOnce(
+      createSuccessResponse(mockProfile)
+    );
     
-    const tool = createLinearGetProfileTool(mockClient as any);
+    const tool = createLinearGetProfileTool(mockClient);
     const response = await tool.handler({}, { signal: new AbortController().signal });
     
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('Success: Profile data retrieved');
     expect(response.content[0].text).toContain('User ID: user-1');
     expect(response.content[0].text).toContain('Name: Test User');
@@ -61,14 +62,14 @@ describe('LinearGetProfileTool (DI pattern)', () => {
       guest: true,
     };
     
-    mockClient.safeGetViewer.mockResolvedValueOnce({
-      success: true,
-      data: minimalProfile,
-    });
+    mockClient.safeGetViewer.mockResolvedValueOnce(
+      createSuccessResponse(minimalProfile)
+    );
     
-    const tool = createLinearGetProfileTool(mockClient as any);
+    const tool = createLinearGetProfileTool(mockClient);
     const response = await tool.handler({}, { signal: new AbortController().signal });
     
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('Success: Profile data retrieved');
     expect(response.content[0].text).toContain('User ID: user-2');
     expect(response.content[0].text).toContain('Name: Minimal User');
@@ -82,25 +83,26 @@ describe('LinearGetProfileTool (DI pattern)', () => {
   });
 
   it('should handle error when profile retrieval fails', async () => {
-    mockClient.safeGetViewer.mockResolvedValueOnce({
-      success: false,
-      error: { message: 'Authentication failed', type: 'AuthenticationError' },
-    });
+    mockClient.safeGetViewer.mockResolvedValueOnce(
+      mockApiResponses.mockErrorResponse('Authentication failed', LinearErrorType.AuthenticationError)
+    );
     
-    const tool = createLinearGetProfileTool(mockClient as any);
+    const tool = createLinearGetProfileTool(mockClient);
     const response = await tool.handler({}, { signal: new AbortController().signal });
     
-    expect(response.content[0].text).toContain('Error: Authentication error');
+    expectErrorResponse(response, 'authentication');
     expect(response.isError).toBe(true);
   });
 
   it('should handle unexpected errors during profile retrieval', async () => {
-    mockClient.safeGetViewer.mockRejectedValueOnce(new Error('Network error'));
+    mockClient.safeGetViewer.mockImplementation(() => {
+      throw new Error('Network error');
+    });
     
-    const tool = createLinearGetProfileTool(mockClient as any);
+    const tool = createLinearGetProfileTool(mockClient);
     const response = await tool.handler({}, { signal: new AbortController().signal });
     
-    expect(response.content[0].text).toContain('Error: Unexpected error');
+    expectErrorResponse(response, 'unexpected');
     expect(response.content[0].text).toContain('Network error');
     expect(response.isError).toBe(true);
   });

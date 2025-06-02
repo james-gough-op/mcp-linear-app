@@ -87,13 +87,15 @@ describe('Response Utilities', () => {
         content: [{
           type: "text",
           text: "This is a test message"
-        }]
+        }],
+        isError: false
       };
       
       expect(response).toHaveProperty('content');
       expect(response.content).toHaveLength(1);
       expect(response.content[0]).toHaveProperty('type', 'text');
       expect(response.content[0]).toHaveProperty('text', 'This is a test message');
+      expect(response).toHaveProperty('isError', false);
     });
   });
 }); 

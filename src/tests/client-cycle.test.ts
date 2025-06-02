@@ -1,6 +1,11 @@
 import { CyclePayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LinearError, LinearResult } from '../libs/errors.js';
+import { LinearError } from '../libs/errors.js';
+import {
+    createSuccessResponse,
+    mockApiResponses,
+    TEST_IDS
+} from './utils/test-utils.js';
 
 // Mock the GraphQL client responses
 vi.mock('../libs/client.js', () => {
@@ -34,13 +39,13 @@ describe('Cycle Management Methods', () => {
       const mockResponse = {
         data: {
           cycle: {
-            id: 'cyc_123',
+            id: TEST_IDS.CYCLE,
             name: 'Sprint 1',
             number: 1,
             startsAt: '2023-01-01',
             endsAt: '2023-01-14',
             team: {
-              id: 'team_123',
+              id: TEST_IDS.TEAM,
               name: 'Engineering',
               key: 'ENG'
             }
@@ -50,7 +55,7 @@ describe('Cycle Management Methods', () => {
 
       vi.mocked(enhancedClient.safeCycle).mockResolvedValueOnce(mockResponse.data.cycle as any);
 
-      const result = await enhancedClient.safeCycle('cyc_123');
+      const result = await enhancedClient.safeCycle(TEST_IDS.CYCLE);
       
       expect(result).toEqual(mockResponse.data.cycle);
     });
@@ -72,15 +77,15 @@ describe('Cycle Management Methods', () => {
 
     it('should throw an error when cycle is not found', async () => {
       const error = new LinearError(
-        'Cycle with ID cyc_123 not found',
+        `Cycle with ID ${TEST_IDS.CYCLE} not found`,
         LinearErrorType.FeatureNotAccessible,
         undefined
       );
 
       vi.mocked(enhancedClient.safeCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient.safeCycle('cyc_123')).rejects.toMatchObject({
-        message: 'Cycle with ID cyc_123 not found',
+      await expect(enhancedClient.safeCycle(TEST_IDS.CYCLE)).rejects.toMatchObject({
+        message: `Cycle with ID ${TEST_IDS.CYCLE} not found`,
         type: LinearErrorType.FeatureNotAccessible
       });
     });
@@ -94,7 +99,7 @@ describe('Cycle Management Methods', () => {
           cycles: {
             nodes: [
               {
-                id: 'cyc_123',
+                id: TEST_IDS.CYCLE,
                 name: 'Sprint 1',
                 number: 1
               },
@@ -123,24 +128,20 @@ describe('Cycle Management Methods', () => {
   describe('createCycle()', () => {
     it('should create a cycle successfully', async () => {
       // Mock successful response with properly typed CyclePayload
-      const mockResponse: LinearResult<CyclePayload> = {
+      const mockResponse = createSuccessResponse({
         success: true,
-        // Use type assertion for the entire payload to avoid property type issues
-        data: {
-          success: true,
-          cycle: {
-            id: 'cyc_123',
-            name: 'Sprint 1',
-            number: 1
-          },
-          lastSyncId: 123
-        } as unknown as CyclePayload
-      };
+        cycle: {
+          id: TEST_IDS.CYCLE,
+          name: 'Sprint 1',
+          number: 1
+        },
+        lastSyncId: 123
+      } as unknown as CyclePayload);
 
       vi.mocked(enhancedClient.safeCreateCycle).mockResolvedValueOnce(mockResponse);
 
       const input: LinearDocument.CycleCreateInput = {
-        teamId: 'team_123',
+        teamId: TEST_IDS.TEAM,
         name: 'Sprint 1',
         startsAt: new Date('2023-01-01'),
         endsAt: new Date('2023-01-14')
@@ -153,14 +154,10 @@ describe('Cycle Management Methods', () => {
 
     it('should return error for missing team ID', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Team ID is required to create a cycle',
-          LinearErrorType.InvalidInput,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Team ID is required to create a cycle',
+        LinearErrorType.InvalidInput
+      );
 
       vi.mocked(enhancedClient.safeCreateCycle).mockResolvedValueOnce(mockResponse);
 
@@ -173,26 +170,22 @@ describe('Cycle Management Methods', () => {
 
       const result = await enhancedClient.safeCreateCycle(input as LinearDocument.CycleCreateInput);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+      expect(result.error?.message).toContain('Team ID is required');
     });
 
     it('should return error when API request fails', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Failed to create cycle',
-          LinearErrorType.Unknown,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Failed to create cycle',
+        LinearErrorType.Unknown
+      );
 
       vi.mocked(enhancedClient.safeCreateCycle).mockResolvedValueOnce(mockResponse);
 
       const input: LinearDocument.CycleCreateInput = {
-        teamId: 'team_123',
+        teamId: TEST_IDS.TEAM,
         name: 'Sprint 1',
         startsAt: new Date('2023-01-01'),
         endsAt: new Date('2023-01-14')
@@ -207,14 +200,10 @@ describe('Cycle Management Methods', () => {
 
     it('should return error for invalid team ID format', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Invalid team ID format',
-          LinearErrorType.InvalidInput,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Invalid team ID format',
+        LinearErrorType.InvalidInput
+      );
 
       vi.mocked(enhancedClient.safeCreateCycle).mockResolvedValueOnce(mockResponse);
 
@@ -227,32 +216,29 @@ describe('Cycle Management Methods', () => {
 
       const result = await enhancedClient.safeCreateCycle(input);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+      expect(result.error?.message).toContain('Invalid team ID format');
     });
   });
 
   describe('updateCycle()', () => {
     it('should update a cycle successfully', async () => {
       // Mock successful response
-      const mockResponse: LinearResult<CyclePayload> = {
+      const mockResponse = createSuccessResponse({
         success: true,
-        data: {
-          success: true,
-          cycle: {
-            id: 'cyc_123',
-            name: 'Updated Sprint',
-            number: 1,
-            description: 'Updated description'
-          },
-          lastSyncId: 456
-        } as unknown as CyclePayload
-      };
+        cycle: {
+          id: TEST_IDS.CYCLE,
+          name: 'Updated Sprint',
+          number: 1,
+          description: 'Updated description'
+        },
+        lastSyncId: 456
+      } as unknown as CyclePayload);
 
       vi.mocked(enhancedClient.safeUpdateCycle).mockResolvedValueOnce(mockResponse);
 
-      const cycleId = 'cyc_123';
+      const cycleId = TEST_IDS.CYCLE;
       const input: LinearDocument.CycleUpdateInput = {
         name: 'Updated Sprint',
         description: 'Updated description'
@@ -267,14 +253,10 @@ describe('Cycle Management Methods', () => {
 
     it('should return error for invalid cycle ID', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Cycle ID cannot be empty',
-          LinearErrorType.InvalidInput,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Cycle ID cannot be empty',
+        LinearErrorType.InvalidInput
+      );
 
       vi.mocked(enhancedClient.safeUpdateCycle).mockResolvedValueOnce(mockResponse);
 
@@ -285,21 +267,17 @@ describe('Cycle Management Methods', () => {
 
       const result = await enhancedClient.safeUpdateCycle(cycleId, input);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+      expect(result.error?.message).toContain('Cycle ID cannot be empty');
     });
 
     it('should return error when cycle is not found', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Cycle with ID cyc_999 not found',
-          LinearErrorType.FeatureNotAccessible,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Cycle with ID cyc_999 not found',
+        LinearErrorType.FeatureNotAccessible
+      );
 
       vi.mocked(enhancedClient.safeUpdateCycle).mockResolvedValueOnce(mockResponse);
 
@@ -310,57 +288,49 @@ describe('Cycle Management Methods', () => {
 
       const result = await enhancedClient.safeUpdateCycle(cycleId, input);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.FeatureNotAccessible);
+      expect(result.error?.message).toContain('not found');
     });
 
     it('should return error for empty update input', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Update input cannot be empty',
-          LinearErrorType.InvalidInput,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Update input cannot be empty',
+        LinearErrorType.InvalidInput
+      );
 
       vi.mocked(enhancedClient.safeUpdateCycle).mockResolvedValueOnce(mockResponse);
 
-      const cycleId = 'cyc_123';
+      const cycleId = TEST_IDS.CYCLE;
       const input: LinearDocument.CycleUpdateInput = {};
 
       const result = await enhancedClient.safeUpdateCycle(cycleId, input);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.InvalidInput);
+      expect(result.error?.message).toContain('Update input cannot be empty');
     });
 
     it('should return error when API request fails', async () => {
       // Mock error response
-      const mockResponse: LinearResult<CyclePayload> = {
-        success: false,
-        error: new LinearError(
-          'Failed to update cycle',
-          LinearErrorType.Unknown,
-          undefined
-        )
-      };
+      const mockResponse = mockApiResponses.mockErrorResponse(
+        'Failed to update cycle',
+        LinearErrorType.Unknown
+      );
 
       vi.mocked(enhancedClient.safeUpdateCycle).mockResolvedValueOnce(mockResponse);
 
-      const cycleId = 'cyc_123';
+      const cycleId = TEST_IDS.CYCLE;
       const input: LinearDocument.CycleUpdateInput = {
         name: 'Updated Sprint'
       };
 
       const result = await enhancedClient.safeUpdateCycle(cycleId, input);
       
-      expect(result).toEqual(mockResponse);
       expect(result.success).toBe(false);
       expect(result.error?.type).toBe(LinearErrorType.Unknown);
+      expect(result.error?.message).toContain('Failed to update cycle');
     });
   });
 
@@ -372,11 +342,11 @@ describe('Cycle Management Methods', () => {
           issueUpdate: {
             success: true,
             issue: {
-              id: 'issue_123',
+              id: TEST_IDS.ISSUE,
               identifier: 'ENG-123',
               title: 'Test Issue',
               cycle: {
-                id: 'cyc_123',
+                id: TEST_IDS.CYCLE,
                 name: 'Sprint 1',
                 number: 1
               }
@@ -387,7 +357,7 @@ describe('Cycle Management Methods', () => {
 
       vi.mocked(enhancedClient.safeAddIssueToCycle).mockResolvedValueOnce(mockResponse.data.issueUpdate as any);
 
-      const result = await enhancedClient.safeAddIssueToCycle('issue_123', 'cyc_123');
+      const result = await enhancedClient.safeAddIssueToCycle(TEST_IDS.ISSUE, TEST_IDS.CYCLE);
       
       expect(result).toEqual(mockResponse.data.issueUpdate);
     });
@@ -401,7 +371,7 @@ describe('Cycle Management Methods', () => {
       
       vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient.safeAddIssueToCycle('', 'cyc_123')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle('', TEST_IDS.CYCLE)).rejects.toMatchObject({
         message: 'Issue ID cannot be empty',
         type: LinearErrorType.InvalidInput
       });
@@ -416,7 +386,7 @@ describe('Cycle Management Methods', () => {
       
       vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient.safeAddIssueToCycle('issue_123', '')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle(TEST_IDS.ISSUE, '')).rejects.toMatchObject({
         message: 'Cycle ID cannot be empty',
         type: LinearErrorType.InvalidInput
       });
@@ -431,7 +401,7 @@ describe('Cycle Management Methods', () => {
 
       vi.mocked(enhancedClient.safeAddIssueToCycle).mockRejectedValueOnce(error);
 
-      await expect(enhancedClient.safeAddIssueToCycle('issue_123', 'cyc_123')).rejects.toMatchObject({
+      await expect(enhancedClient.safeAddIssueToCycle(TEST_IDS.ISSUE, TEST_IDS.CYCLE)).rejects.toMatchObject({
         message: 'Failed to add issue to cycle',
         type: LinearErrorType.Unknown
       });

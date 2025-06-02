@@ -1,8 +1,8 @@
 import { LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { LinearError } from '../libs/errors.js';
 import { validateApiKey } from '../libs/id-management.js';
+import { mockApiResponses } from './utils/test-utils.js';
 
 /**
  * Tests for Linear API authentication
@@ -72,18 +72,14 @@ describe('Linear API Authentication', () => {
   
   it('should handle authentication failures', async () => {
     // Override the mock for this specific test
-    const errorMock = {
-      success: false,
-      error: new LinearError(
-        'Authentication failed', 
-        LinearErrorType.AuthenticationError,
-        null,
-        401
-      )
-    };
+    const errorResponse = mockApiResponses.mockErrorResponse(
+      'Authentication failed', 
+      LinearErrorType.AuthenticationError,
+      401
+    );
     
     (enhancedClient.testAuthentication as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce(errorMock);
+      .mockResolvedValueOnce(errorResponse);
     
     const result = await enhancedClient.testAuthentication();
     

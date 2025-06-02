@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinearError, LinearResult } from '../libs/errors.js';
 import { createLinearCreateLabelTool, LinearCreateLabelTool } from '../tools/linear/create-label.js';
 import { setupMockServer } from './mocks/msw-setup.js';
+import {
+    createMockClient,
+    createSuccessResponse,
+    expectErrorResponse,
+    expectSuccessResponse,
+    mockApiResponses
+} from './utils/test-utils.js';
 
 // Type for GraphQL request
 type GraphQLRequest = {
@@ -150,20 +157,30 @@ describe('LinearCreateLabelTool', () => {
 });
 
 describe('LinearCreateLabelTool (DI pattern)', () => {
-  let mockClient: any;
+  let mockClient: ReturnType<typeof createMockClient>;
+
   beforeEach(() => {
-    mockClient = {
-      safeCreateIssueLabel: vi.fn()
-    };
+    mockClient = createMockClient();
   });
 
   it('should successfully create a label', async () => {
-    vi.mocked(mockClient.safeCreateIssueLabel).mockResolvedValueOnce({
-      success: true,
-      data: { issueLabel: { id: 'label-123', name: 'Bug', color: '#FF0000' } }
-    });
+    mockClient.safeCreateIssueLabel.mockResolvedValueOnce(
+      createSuccessResponse({ 
+        issueLabel: { 
+          id: 'label-123', 
+          name: 'Bug', 
+          color: '#FF0000' 
+        } 
+      })
+    );
+    
     const tool = createLinearCreateLabelTool(mockClient);
-    const response = await tool.handler({ name: 'Bug', color: '#FF0000' }, { signal: new AbortController().signal });
+    const response = await tool.handler(
+      { name: 'Bug', color: '#FF0000' }, 
+      { signal: new AbortController().signal }
+    );
+    
+    expectSuccessResponse(response);
     expect(response.content[0].text).toContain('Success: label created');
     expect(response.content[0].text).toContain('ID: label-123');
     expect(response.content[0].text).toContain('name: "Bug"');
@@ -172,10 +189,17 @@ describe('LinearCreateLabelTool (DI pattern)', () => {
   });
 
   it('should handle API errors gracefully', async () => {
-    vi.mocked(mockClient.safeCreateIssueLabel).mockResolvedValueOnce({ success: false, error: { message: 'API Error' } });
+    mockClient.safeCreateIssueLabel.mockResolvedValueOnce(
+      mockApiResponses.mockErrorResponse('API Error', LinearErrorType.Unknown)
+    );
+    
     const tool = createLinearCreateLabelTool(mockClient);
-    const response = await tool.handler({ name: 'Bug', color: '#FF0000' }, { signal: new AbortController().signal });
+    const response = await tool.handler(
+      { name: 'Bug', color: '#FF0000' }, 
+      { signal: new AbortController().signal }
+    );
+    
+    expectErrorResponse(response, 'error');
     expect(response.content[0].text).toContain('API Error');
-    expect(response.content[0].text).toContain('Error');
   });
 }); 

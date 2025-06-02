@@ -588,8 +588,11 @@ class EnhancedLinearClient {
       const variables = { id, input };
       // Note: Original used executeGraphQLMutation directly, changed to safeExecute for consistency pattern, but this means handling its Result
       const result = await this.safeExecuteGraphQLMutation<{ commentUpdate: CommentPayload }>(mutation, variables);
-      if (!result.success || !result.data?.commentUpdate) {
-         throw new LinearError(result.error?.message || `Failed to update comment with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError );
+      if (!result.success) {
+        throw new LinearError(result.error?.message || `Failed to update comment with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
+      }
+      if (!result.data?.commentUpdate) {
+        throw new LinearError(`Failed to update comment with ID ${id}: No data returned`, LinearErrorType.Unknown);
       }
       return result.data.commentUpdate;
     } catch (error) {
@@ -599,6 +602,12 @@ class EnhancedLinearClient {
   }
   public async safeUpdateComment(id: string, input: LinearDocument.CommentUpdateInput): Promise<LinearResult<CommentPayload>> {
     try {
+      validateLinearId(id, LinearEntityType.COMMENT);
+      if (!input.body) { 
+        return createErrorResult<CommentPayload>(
+          new LinearError('Comment body is required for update', LinearErrorType.InvalidInput)
+        );
+      }
       const resultData = await this._updateComment(id, input);
       return createSuccessResult<CommentPayload>(resultData);
     } catch (error) {
@@ -617,10 +626,12 @@ class EnhancedLinearClient {
         }
       `;
       const variables = { id };
-      // Note: Original used executeGraphQLMutation directly
       const result = await this.safeExecuteGraphQLMutation<{ commentDelete: DeletePayload }>(mutation, variables);
-       if (!result.success || !result.data?.commentDelete) {
+      if (!result.success) {
         throw new LinearError(result.error?.message || `Failed to delete comment with ID ${id}`, result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
+      }
+      if (!result.data?.commentDelete) {
+        throw new LinearError(`Failed to delete comment with ID ${id}: No data returned`, LinearErrorType.Unknown);
       }
       return result.data.commentDelete;
     } catch (error) {
@@ -630,6 +641,7 @@ class EnhancedLinearClient {
   }
   public async safeDeleteComment(id: string): Promise<LinearResult<DeletePayload>> {
     try {
+      validateLinearId(id, LinearEntityType.COMMENT);
       const resultData = await this._deleteComment(id);
       return createSuccessResult<DeletePayload>(resultData);
     } catch (error) {
@@ -741,11 +753,18 @@ class EnhancedLinearClient {
   }
   public async safeTeam(id: string): Promise<LinearResult<Team>> {
     try {
+      validateLinearId(id, LinearEntityType.TEAM);
       const team = await this._team(id);
       return createSuccessResult<Team>(team);
     } catch (error) {
-      if (error instanceof LinearError) { return createErrorResult<Team>(error); }
-      const linearError = new LinearError(`Error in safeTeam: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
+      if (error instanceof LinearError) {
+        return createErrorResult<Team>(error);
+      }
+      const linearError = new LinearError(
+        error instanceof Error ? error.message : 'Unknown error',
+        "Unknown" as LinearErrorType,
+        error
+      );
       return createErrorResult<Team>(linearError);
     }
   }
@@ -1025,6 +1044,182 @@ class EnhancedLinearClient {
       if (error instanceof LinearError) { return createErrorResult<any>(error); }
       const linearError = new LinearError(`Error in safeCreateProject: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
       return createErrorResult<any>(linearError);
+    }
+  }
+
+  /**
+   * Fetch a project by ID
+   */
+  public async _project(id: string): Promise<LinearDocument.Project> {
+    validateLinearId(id, LinearEntityType.PROJECT);
+    
+    const query = `
+      query Project($id: String!) {
+        project(id: $id) {
+          id
+          name
+          description
+          icon
+          color
+          state
+          startDate
+          targetDate
+          scope {
+            issues {
+              nodes {
+                id
+                title
+              }
+            }
+          }
+          teams {
+            nodes {
+              id
+              name
+              key
+            }
+          }
+          members {
+            nodes {
+              id
+              name
+              displayName
+            }
+          }
+          issues {
+            nodes {
+              id
+              title
+              state {
+                id
+                name
+                type
+              }
+            }
+          }
+          createdAt
+          updatedAt
+          leadId
+          lead {
+            id
+            name
+            displayName
+          }
+        }
+      }
+    `;
+    
+    const response = await this.executeGraphQLQuery<{
+      project: LinearDocument.Project;
+    }>(query, { id });
+    
+    if (!response.data || !response.data.project) {
+      throw new LinearError(
+        `Project not found with ID: ${id}`,
+        "FeatureNotAccessible" as LinearErrorType
+      );
+    }
+    
+    return response.data.project;
+  }
+  
+  /**
+   * Safe method to fetch a project by ID with error handling
+   */
+  public async safeProject(id: string): Promise<LinearResult<LinearDocument.Project>> {
+    try {
+      validateLinearId(id, LinearEntityType.PROJECT);
+      const project = await this._project(id);
+      return createSuccessResult<LinearDocument.Project>(project);
+    } catch (error) {
+      if (error instanceof LinearError) {
+        return createErrorResult<LinearDocument.Project>(error);
+      }
+      const linearError = new LinearError(
+        error instanceof Error ? error.message : 'Unknown error',
+        "Unknown" as LinearErrorType,
+        error
+      );
+      return createErrorResult<LinearDocument.Project>(linearError);
+    }
+  }
+  
+  /**
+   * Fetch multiple projects with optional filtering and pagination
+   */
+  public async _projects(
+    filter?: LinearDocument.ProjectFilter, 
+    first: number = 50, 
+    after?: string
+  ): Promise<LinearDocument.ProjectConnection> {
+    const query = `
+      query Projects($filter: ProjectFilter, $first: Int, $after: String) {
+        projects(filter: $filter, first: $first, after: $after) {
+          nodes {
+            id
+            name
+            description
+            icon
+            color
+            state
+            startDate
+            targetDate
+            createdAt
+            updatedAt
+            teamIds
+            teams {
+              nodes {
+                id
+                name
+                key
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            hasPreviousPage
+            startCursor
+            endCursor
+          }
+        }
+      }
+    `;
+    
+    const response = await this.executeGraphQLQuery<{
+      projects: LinearDocument.ProjectConnection;
+    }>(query, { filter, first, after });
+    
+    if (!response.data || !response.data.projects) {
+      throw new LinearError(
+        'Failed to fetch projects',
+        "Unknown" as LinearErrorType
+      );
+    }
+    
+    return response.data.projects;
+  }
+  
+  /**
+   * Safe method to fetch multiple projects with error handling
+   */
+  public async safeProjects(
+    filter?: LinearDocument.ProjectFilter, 
+    first: number = 50, 
+    after?: string
+  ): Promise<LinearResult<LinearDocument.ProjectConnection>> {
+    try {
+      const projects = await this._projects(filter, first, after);
+      return createSuccessResult<LinearDocument.ProjectConnection>(projects);
+    } catch (error) {
+      if (error instanceof LinearError) {
+        return createErrorResult<LinearDocument.ProjectConnection>(error);
+      }
+      const linearError = new LinearError(
+        error instanceof Error ? error.message : 'Unknown error',
+        "Unknown" as LinearErrorType,
+        error
+      );
+      return createErrorResult<LinearDocument.ProjectConnection>(linearError);
     }
   }
 }

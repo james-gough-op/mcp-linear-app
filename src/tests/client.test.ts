@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import enhancedClient from '../libs/client.js';
 import { LinearResult } from '../libs/errors.js';
+import { createSuccessResponse, TEST_IDS } from './utils/test-utils.js';
 
 /**
  * Tests for the enhanced Linear client
@@ -60,7 +61,7 @@ describe('Linear GraphQL Client', () => {
       
       const mockVariables = {
         title: "Test Issue (Mock)",
-        teamId: "mock-team-id"
+        teamId: TEST_IDS.TEAM
       };
       
       // We'll intercept the actual API call by creating a test wrapper
@@ -80,18 +81,15 @@ describe('Linear GraphQL Client', () => {
         expect(mutation).toContain('input');
         
         // Success! Our client formatted the mutation correctly
-        return {
-          data: {
-            // Simulate a successful response
-            issueCreate: {
-              success: true,
-              issue: {
-                id: 'mock-issue-id',
-                title: variables.title
-              }
+        return createSuccessResponse({
+          issueCreate: {
+            success: true,
+            issue: {
+              id: TEST_IDS.ISSUE,
+              title: variables.title
             }
           }
-        };
+        });
       };
       
       // Test the formatting capability

@@ -1,23 +1,28 @@
 import { IssueLabelPayload, LinearDocument, LinearErrorType } from '@linear/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enhancedClient from '../libs/client.js';
-import { createErrorResult, createSuccessResult, LinearError } from '../libs/errors.js';
-import { MOCK_IDS } from './mocks/mock-data.js';
+import { LinearError } from '../libs/errors.js';
+import {
+    createSuccessResponse,
+    mockApiResponses,
+    mockTeamData,
+    TEST_IDS
+} from './utils/test-utils.js';
 
 // Helper to create a mock label
 function createMockIssueLabelPayload(): IssueLabelPayload {
   return {
     success: true,
     issueLabel: {
-      id: 'label_123abc',
+      id: TEST_IDS.LABEL,
       name: 'Test Label',
       color: '#FF5500',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       team: {
-        id: MOCK_IDS.TEAM,
-        name: 'Test Team',
-        key: 'TST'
+        id: TEST_IDS.TEAM,
+        name: mockTeamData.name,
+        key: mockTeamData.key
       }
     },
     lastSyncId: 12345
@@ -45,12 +50,12 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     const input: LinearDocument.IssueLabelCreateInput = {
       name: 'Test Label',
       color: '#FF5500',
-      teamId: MOCK_IDS.TEAM
+      teamId: TEST_IDS.TEAM
     };
     
     // Mock the underlying GraphQL method that safeCreateIssueLabel uses
     vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
-      createSuccessResult({ issueLabelCreate: mockPayload })
+      createSuccessResponse({ issueLabelCreate: mockPayload })
     );
     
     // Act
@@ -71,7 +76,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     // Arrange
     const input = {
       color: '#FF5500',
-      teamId: MOCK_IDS.TEAM
+      teamId: TEST_IDS.TEAM
     } as LinearDocument.IssueLabelCreateInput;
     
     // Act 
@@ -89,7 +94,7 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     // Arrange
     const input = {
       name: 'Test Label',
-      teamId: MOCK_IDS.TEAM
+      teamId: TEST_IDS.TEAM
     } as LinearDocument.IssueLabelCreateInput;
     
     // Act
@@ -108,12 +113,11 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     const input: LinearDocument.IssueLabelCreateInput = {
       name: 'Test Label',
       color: '#FF5500',
-      teamId: MOCK_IDS.TEAM
+      teamId: TEST_IDS.TEAM
     };
     
-    const apiError = new LinearError('API error', LinearErrorType.NetworkError);
     vi.mocked(enhancedClient.safeExecuteGraphQLMutation).mockResolvedValueOnce(
-      createErrorResult(apiError)
+      mockApiResponses.mockErrorResponse('API error', LinearErrorType.NetworkError)
     );
     
     // Act
@@ -121,7 +125,9 @@ describe('enhancedClient.safeCreateIssueLabel', () => {
     
     // Assert
     expect(result.success).toBe(false);
-    expect(result.error).toEqual(apiError);
+    expect(result.error).toBeInstanceOf(LinearError);
+    expect(result.error?.type).toBe(LinearErrorType.NetworkError);
+    expect(result.error?.message).toContain('API error');
     expect(enhancedClient.safeExecuteGraphQLMutation).toHaveBeenCalledTimes(1);
   });
 });
