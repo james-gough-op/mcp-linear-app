@@ -1,9 +1,6 @@
 import { LinearClient } from '@linear/sdk';
 import enhancedClient from './client.js';
 
-// Store the original client for resetting in tests
-const originalClient = enhancedClient;
-
 // Mock client for testing
 let mockClient: typeof enhancedClient | null = null;
 

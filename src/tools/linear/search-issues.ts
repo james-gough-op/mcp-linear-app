@@ -1,7 +1,8 @@
-import { Issue as LinearIssue } from "@linear/sdk";
+import { IssueConnection, LinearDocument, Issue as LinearIssue } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearResult } from '../../libs/errors.js';
 import { createLogger } from '../../libs/logger.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
 import { safeText } from "../../libs/utils.js";
@@ -57,7 +58,7 @@ async function formatIssueForSearch(issue: LinearIssue): Promise<string> {
 
 // Minimal interface for DI
 interface HasSafeIssues {
-  safeIssues: (args: any, limit: number) => Promise<any>;
+  safeIssues: (filter?: LinearDocument.IssueFilter, first?: number, after?: string) => Promise<LinearResult<IssueConnection>>;
 }
 
 export function createLinearSearchIssuesTool(enhancedClient: HasSafeIssues = getEnhancedClient()) {

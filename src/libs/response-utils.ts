@@ -79,12 +79,11 @@ export async function formatIssueResponse(issue: Issue): Promise<McpResponse> {
   // Labels if present - handle with type casting due to SDK complexity
   if (issue.labels) {
     try {
-      const labels = await issue.labels;
-      // @ts-ignore - labels structure is complex in the SDK
-      if (labels && labels.nodes && labels.nodes.length > 0) {
-        // @ts-ignore - using any type for simplicity
-        const labelStrings = labels.nodes.map(label => 
-          `${safeText(label.name)} (${label.color})`
+      // issue.labels is a function that returns a Promise of IssueLabelConnection
+      const labelsConnection = await issue.labels();
+      if (labelsConnection && labelsConnection.nodes && labelsConnection.nodes.length > 0) {
+        const labelStrings = labelsConnection.nodes.map(label => 
+          `${safeText(label.name)} (${safeText(label.color)})`
         );
         result += `\nLABELS: ${labelStrings.join(', ')}\n`;
       }

@@ -1,29 +1,29 @@
 import {
-    CommentPayload,
-    Cycle,
-    CycleConnection,
-    CyclePayload,
-    DeletePayload,
-    Issue,
-    IssueConnection,
-    IssueLabelPayload,
-    IssuePayload,
-    LinearClient,
-    LinearDocument,
-    LinearErrorType,
-    LinearRawResponse,
-    Team,
-    TeamConnection,
-    User
+  CommentPayload,
+  Cycle,
+  CycleConnection,
+  CyclePayload,
+  DeletePayload,
+  Issue,
+  IssueConnection,
+  IssueLabelPayload,
+  IssuePayload,
+  LinearClient,
+  LinearDocument,
+  LinearErrorType,
+  LinearRawResponse,
+  Team,
+  TeamConnection,
+  User
 } from '@linear/sdk';
 import dotenv from 'dotenv';
 
 import {
-    LinearError,
-    LinearResult,
-    createErrorResult,
-    createSuccessResult,
-    logLinearError
+  LinearError,
+  LinearResult,
+  createErrorResult,
+  createSuccessResult,
+  logLinearError
 } from './errors.js';
 import { LinearEntityType, validateApiKey, validateLinearId } from './id-management.js';
 
@@ -32,6 +32,14 @@ dotenv.config();
 
 // Get the API key from environment variable
 const envApiKey = process.env.LINEAR_API_KEY;
+
+/**
+ * Interface for the projectCreate mutation response
+ */
+interface ProjectPayload {
+  success: boolean;
+  project: LinearDocument.Project;
+}
 
 class EnhancedLinearClient {
   public linearSdkClient: LinearClient;
@@ -1001,7 +1009,7 @@ class EnhancedLinearClient {
   }
 
   // --- PROJECT CREATION ---
-  public async _createProject(input: LinearDocument.ProjectCreateInput): Promise<any> {
+  public async _createProject(input: LinearDocument.ProjectCreateInput): Promise<ProjectPayload> {
     try {
       if (!input.name) { throw new LinearError('Project name is required', LinearErrorType.InvalidInput); }
       if (!input.teamIds || input.teamIds.length === 0) { throw new LinearError('At least one team ID is required', LinearErrorType.InvalidInput); }
@@ -1026,7 +1034,7 @@ class EnhancedLinearClient {
         }
       `;
       const variables = { input };
-      const result = await this.safeExecuteGraphQLMutation<{ projectCreate: any }>(mutation, variables);
+      const result = await this.safeExecuteGraphQLMutation<{ projectCreate: ProjectPayload }>(mutation, variables);
       if (!result.success || !result.data?.projectCreate) {
         throw new LinearError(result.error?.message || 'Failed to create project', result.error?.type || LinearErrorType.Unknown, result.error?.originalError);
       }
@@ -1036,20 +1044,17 @@ class EnhancedLinearClient {
       throw new LinearError(`Error creating project: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
     }
   }
-  public async safeCreateProject(input: LinearDocument.ProjectCreateInput): Promise<LinearResult<any>> {
+  public async safeCreateProject(input: LinearDocument.ProjectCreateInput): Promise<LinearResult<ProjectPayload>> {
     try {
       const resultData = await this._createProject(input);
-      return createSuccessResult<any>(resultData);
+      return createSuccessResult<ProjectPayload>(resultData);
     } catch (error) {
-      if (error instanceof LinearError) { return createErrorResult<any>(error); }
+      if (error instanceof LinearError) { return createErrorResult<ProjectPayload>(error); }
       const linearError = new LinearError(`Error in safeCreateProject: ${error instanceof Error ? error.message : 'Unknown error'}`, LinearErrorType.Unknown, error);
-      return createErrorResult<any>(linearError);
+      return createErrorResult<ProjectPayload>(linearError);
     }
   }
 
-  /**
-   * Fetch a project by ID
-   */
   public async _project(id: string): Promise<LinearDocument.Project> {
     validateLinearId(id, LinearEntityType.PROJECT);
     
@@ -1123,9 +1128,6 @@ class EnhancedLinearClient {
     return response.data.project;
   }
   
-  /**
-   * Safe method to fetch a project by ID with error handling
-   */
   public async safeProject(id: string): Promise<LinearResult<LinearDocument.Project>> {
     try {
       validateLinearId(id, LinearEntityType.PROJECT);
@@ -1144,9 +1146,6 @@ class EnhancedLinearClient {
     }
   }
   
-  /**
-   * Fetch multiple projects with optional filtering and pagination
-   */
   public async _projects(
     filter?: LinearDocument.ProjectFilter, 
     first: number = 50, 
@@ -1199,9 +1198,6 @@ class EnhancedLinearClient {
     return response.data.projects;
   }
   
-  /**
-   * Safe method to fetch multiple projects with error handling
-   */
   public async safeProjects(
     filter?: LinearDocument.ProjectFilter, 
     first: number = 50, 

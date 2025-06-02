@@ -1,7 +1,8 @@
-import { LinearDocument } from "@linear/sdk";
+import { CommentPayload, LinearDocument } from "@linear/sdk";
 import { z } from "zod";
 import { getEnhancedClient } from '../../libs/client.js';
 import { McpResponse, formatCatchErrorResponse, formatErrorResponse, formatValidationError } from '../../libs/error-utils.js';
+import { LinearResult } from '../../libs/errors.js';
 import { createLogger } from '../../libs/logger.js';
 import { formatSuccessResponse } from '../../libs/response-utils.js';
 import { createSafeTool } from "../../libs/tool-utils.js";
@@ -18,10 +19,11 @@ const createCommentSchema = z.object({
 // Type for our validated input
 type ValidatedCommentInput = z.infer<typeof createCommentSchema>;
 
-// Factory to create the tool with a provided client (for DI/testing)
+// Minimal interface for DI
 interface HasSafeCreateComment {
-  safeCreateComment: (input: any) => Promise<any>;
+  safeCreateComment: (input: LinearDocument.CommentCreateInput) => Promise<LinearResult<CommentPayload>>;
 }
+
 export function createLinearCreateCommentTool(enhancedClient: HasSafeCreateComment = getEnhancedClient()) {
   return createSafeTool({
     name: "create_comment",
